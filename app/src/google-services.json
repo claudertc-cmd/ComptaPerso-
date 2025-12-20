@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "970404922084",
+    "firebase_url": "https://comptaperso-app-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "comptaperso-app",
+    "storage_bucket": "comptaperso-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:970404922084:android:7b936b35d36df4c04262f1",
+        "android_client_info": {
+          "package_name": "com.example.comptaperso"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBTx18mY9CWRK6qHFzNaXCU-tSkA8xoeJA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
