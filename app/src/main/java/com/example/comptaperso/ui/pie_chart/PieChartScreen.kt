@@ -4,7 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,10 +17,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlin.math.cos
+import kotlin.math.sin
 
 @Composable
 fun PieChartScreen(
@@ -52,7 +55,7 @@ fun PieChartScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "  ",
+                text = "Répartition des Actifs",
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(bottom = 24.dp)
             )
@@ -62,11 +65,12 @@ fun PieChartScreen(
                 totalValue = totalValue,
                 colors = accountColors
             )
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(56.dp))
             ChartLegend(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 groupedData = groupedData,
-                colors = groupColors
+                groupColors = groupColors,
+                accountColors = accountColors
             )
         }
     } else {
@@ -86,10 +90,11 @@ private fun DonutChart(
     totalValue: Float,
     colors: List<Color>
 ) {
-    var startAngle = -180f
-    val strokeWidth = 80.dp // Augmenté de 50.dp à 60.dp
-    val accountGapAngle = 1.5f
+    var startAngle = -80f
+    val strokeWidth = 80.dp
+    val accountGapAngle = 0.5f
     val categoryGapAngle = 6f
+    val explosion = 10.dp
 
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -102,16 +107,26 @@ private fun DonutChart(
 
                 var colorIndex = 0
                 groupedData.forEach { group ->
+                    val isBancaire = group.groupName == "Bancaire"
+                    val groupExplosion = if (isBancaire) explosion.toPx() else 0f
+
                     if (group.accounts.isNotEmpty()) {
                         group.accounts.forEachIndexed { accountIndex, account ->
                             val sweepAngle = (account.value / totalValue) * angleForData
-                            drawArc(
-                                color = colors[colorIndex],
-                                startAngle = startAngle,
-                                sweepAngle = sweepAngle,
-                                useCenter = false,
-                                style = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Butt)
-                            )
+
+                            val angleInRadians = Math.toRadians((startAngle + sweepAngle / 2).toDouble())
+                            val offsetX = (groupExplosion * cos(angleInRadians)).toFloat()
+                            val offsetY = (groupExplosion * sin(angleInRadians)).toFloat()
+
+                            translate(left = offsetX, top = offsetY) {
+                                drawArc(
+                                    color = colors[colorIndex],
+                                    startAngle = startAngle,
+                                    sweepAngle = sweepAngle,
+                                    useCenter = false,
+                                    style = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Butt)
+                                )
+                            }
                             colorIndex++
 
                             val isLastAccountInGroup = accountIndex == group.accounts.lastIndex
@@ -134,20 +149,31 @@ private fun DonutChart(
 private fun ChartLegend(
     modifier: Modifier = Modifier,
     groupedData: List<GroupedChartData>,
-    colors: List<Color>
+    groupColors: List<Color>,
+    accountColors: List<Color>
 ) {
+    val groupAccountColorOffsets = remember(groupedData) {
+        mutableListOf<Int>().apply {
+            var currentOffset = 0
+            groupedData.forEach {
+                add(currentOffset)
+                currentOffset += it.accounts.size
+            }
+        }
+    }
+
     LazyColumn(
         modifier = modifier,
         horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         groupedData.forEachIndexed { groupIndex, group ->
-            item {
+            item(key = "group_${group.groupName}") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
                             .size(20.dp)
-                            .background(colors[groupIndex], CircleShape)
+                            .background(groupColors[groupIndex], CircleShape)
                     )
                     Spacer(Modifier.width(12.dp))
                     Text(
@@ -163,8 +189,24 @@ private fun ChartLegend(
                     )
                 }
             }
-            items(group.accounts) { accountData ->
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 32.dp)) {
+
+            val accountColorOffset = groupAccountColorOffsets.getOrElse(groupIndex) { 0 }
+
+            itemsIndexed(
+                items = group.accounts,
+                key = { accountIndex, account -> "account_${group.groupName}_${account.label}_$accountIndex" }
+            ) { accountIndex, accountData ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 12.dp) // Indent to align smaller dot
+                ) {
+                    val color = accountColors.getOrElse(accountColorOffset + accountIndex) { Color.Transparent }
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp) // Smaller dot
+                            .background(color, CircleShape)
+                    )
+                    Spacer(Modifier.width(16.dp)) // Spacer to align text with category text
                     Text(
                         text = accountData.label,
                         modifier = Modifier.weight(1f),
@@ -191,8 +233,8 @@ private fun generateColorPalettes(): List<List<Color>> {
         // Purples
         listOf(Color(0xFF311B92), Color(0xFF512DA8), Color(0xFF673AB7), Color(0xFF9575CD), Color(0xFFD1C4E9)),
         // Teals
-        listOf(Color(0xFF004D40), Color(0xFF00796B), Color(0xFF009688), Color(0xFF4DB6AC), Color(0xFFB2DFDB)),
+        listOf(Color(0xFF004D40), Color(0xFF00796B), Color(0xFF009688),  Color(0xFF4DB6AC), Color(0xFFB2DFDB)),
         // Reds
         listOf(Color(0xFFB71C1C), Color(0xFFD32F2F), Color(0xFFF44336), Color(0xFFE57373), Color(0xFFFFCDD2))
-    )
+    ) 
 }

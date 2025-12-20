@@ -47,7 +47,7 @@ class PieChartViewModel(application: Application) : AndroidViewModel(application
                 )
             }
             .filter { it.accounts.isNotEmpty() }
-            .sortedBy { it.groupName } // Trier les groupes par nom pour une couleur stable
+            .sortedWith(compareBy<GroupedChartData> { it.groupName != "Bancaire" }.thenBy { it.groupName })
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
