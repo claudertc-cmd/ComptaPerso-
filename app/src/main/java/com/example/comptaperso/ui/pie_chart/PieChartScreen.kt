@@ -32,8 +32,6 @@ fun PieChartScreen(
         val totalValue = remember(groupedData) { groupedData.sumOf { it.totalValue.toDouble() }.toFloat() }
         val colorPalettes = remember { generateColorPalettes() }
 
-        val accountsChartData = remember(groupedData) { groupedData.flatMap { it.accounts } }
-
         val accountColors = remember(groupedData, colorPalettes) {
             groupedData.flatMapIndexed { groupIndex, group ->
                 val palette = colorPalettes[groupIndex % colorPalettes.size]
@@ -54,13 +52,13 @@ fun PieChartScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Répartition des Actifs",
+                text = "  ",
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(bottom = 24.dp)
             )
             DonutChart(
                 modifier = Modifier.size(220.dp),
-                data = accountsChartData,
+                groupedData = groupedData,
                 totalValue = totalValue,
                 colors = accountColors
             )
@@ -84,28 +82,43 @@ fun PieChartScreen(
 @Composable
 private fun DonutChart(
     modifier: Modifier = Modifier,
-    data: List<ChartData>,
+    groupedData: List<GroupedChartData>,
     totalValue: Float,
     colors: List<Color>
 ) {
-    var startAngle = -90f
-    val strokeWidth = 50.dp
-    val gapAngle = 1f // Espace entre les segments
+    var startAngle = -180f
+    val strokeWidth = 80.dp // Augmenté de 50.dp à 60.dp
+    val accountGapAngle = 1.5f
+    val categoryGapAngle = 6f
 
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val totalAngleToDraw = if (totalValue > 0) 360f - data.size * gapAngle else 360f
-            data.forEachIndexed { index, chartData ->
-                if (chartData.value > 0) {
-                    val sweepAngle = (chartData.value / totalValue) * totalAngleToDraw
-                    drawArc(
-                        color = colors[index],
-                        startAngle = startAngle,
-                        sweepAngle = sweepAngle,
-                        useCenter = false,
-                        style = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Butt)
-                    )
-                    startAngle += sweepAngle + gapAngle
+            if (totalValue > 0f) {
+                val numAccounts = groupedData.sumOf { it.accounts.size }
+                val numCategories = groupedData.count { it.accounts.isNotEmpty() }
+
+                val totalGapsAngle = (numAccounts - numCategories) * accountGapAngle + numCategories * categoryGapAngle
+                val angleForData = 360f - totalGapsAngle
+
+                var colorIndex = 0
+                groupedData.forEach { group ->
+                    if (group.accounts.isNotEmpty()) {
+                        group.accounts.forEachIndexed { accountIndex, account ->
+                            val sweepAngle = (account.value / totalValue) * angleForData
+                            drawArc(
+                                color = colors[colorIndex],
+                                startAngle = startAngle,
+                                sweepAngle = sweepAngle,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Butt)
+                            )
+                            colorIndex++
+
+                            val isLastAccountInGroup = accountIndex == group.accounts.lastIndex
+                            val gap = if (isLastAccountInGroup) categoryGapAngle else accountGapAngle
+                            startAngle += sweepAngle + gap
+                        }
+                    }
                 }
             }
         }
