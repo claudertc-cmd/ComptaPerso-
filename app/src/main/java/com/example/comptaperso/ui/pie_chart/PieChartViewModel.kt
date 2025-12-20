@@ -12,29 +12,42 @@ import kotlinx.coroutines.flow.stateIn
 // Version simple: juste un nom et une valeur
 data class ChartData(val label: String, val value: Float)
 
+// Nouvelle classe pour les données groupées
+data class GroupedChartData(val groupName: String, val totalValue: Float, val accounts: List<ChartData>)
+
 class PieChartViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = DataRepository(application)
 
-    // Expose une liste simple, pas de données groupées
-    val chartData: StateFlow<List<ChartData>> = combine(
+    val groupedData: StateFlow<List<GroupedChartData>> = combine(
         repository.accounts,
         repository.transactions,
         repository.accountExtras,
         repository.balances
     ) { accounts, transactionsMap, extrasMap, balancesMap ->
-        accounts.map { account ->
-            val balance = when (account.type) {
-                "Bancaire", "Carte de Crédit", "Paypal" -> {
-                    calculateFinalBalance(account, extrasMap[account.id], transactionsMap[account.id] ?: emptyList())
-                }
-                else -> {
-                    balancesMap[account.id] ?: 0.0
-                }
+        accounts
+            .groupBy { it.type }
+            .map { (type, accountsInGroup) ->
+                val accountsWithBalance = accountsInGroup.map { account ->
+                    val balance = when (account.type) {
+                        "Bancaire", "Carte de Crédit", "Paypal" -> {
+                            calculateFinalBalance(account, extrasMap[account.id], transactionsMap[account.id] ?: emptyList())
+                        }
+                        else -> {
+                            balancesMap[account.id] ?: 0.0
+                        }
+                    }
+                    ChartData(account.name, balance.toFloat())
+                }.filter { it.value > 0 }
+
+                GroupedChartData(
+                    groupName = type,
+                    accounts = accountsWithBalance,
+                    totalValue = accountsWithBalance.sumOf { it.value.toDouble() }.toFloat()
+                )
             }
-            ChartData(account.name, balance.toFloat())
-        }
-        .filter { it.value > 0 } // On garde ce filtre, c'est utile
+            .filter { it.accounts.isNotEmpty() }
+            .sortedBy { it.groupName } // Trier les groupes par nom pour une couleur stable
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
