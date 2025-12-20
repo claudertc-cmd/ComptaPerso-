@@ -9,33 +9,32 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
+// Version simple: juste un nom et une valeur
 data class ChartData(val label: String, val value: Float)
 
 class PieChartViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = DataRepository(application)
 
+    // Expose une liste simple, pas de données groupées
     val chartData: StateFlow<List<ChartData>> = combine(
         repository.accounts,
         repository.transactions,
         repository.accountExtras,
-        repository.balances // Ajouter les soldes pour les comptes simplifiés
+        repository.balances
     ) { accounts, transactionsMap, extrasMap, balancesMap ->
         accounts.map { account ->
             val balance = when (account.type) {
                 "Bancaire", "Carte de Crédit", "Paypal" -> {
-                    val extras = extrasMap[account.id]
-                    val transactions = transactionsMap[account.id] ?: emptyList()
-                    calculateFinalBalance(account, extras, transactions)
+                    calculateFinalBalance(account, extrasMap[account.id], transactionsMap[account.id] ?: emptyList())
                 }
                 else -> {
-                    // Pour "Epargne", "Assurance", etc.
                     balancesMap[account.id] ?: 0.0
                 }
             }
             ChartData(account.name, balance.toFloat())
         }
-        .filter { it.value > 0 } // Ne pas montrer les comptes avec un solde nul ou négatif
+        .filter { it.value > 0 } // On garde ce filtre, c'est utile
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),

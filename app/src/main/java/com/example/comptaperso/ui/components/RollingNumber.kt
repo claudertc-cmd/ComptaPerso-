@@ -1,18 +1,5 @@
 package com.example.comptaperso.ui.components
 
-// Animation (ici on pourrait enlever animateIntAsState, on ne l'utilise plus)
-
-// Layout de base
-
-// Style visuel des rouleaux
-
-// Texte et style
-
-// État et effets
-
-// Alignement, tailles, unités
-
-// Pour gérer les délais entre étapes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -42,27 +29,34 @@ import kotlinx.coroutines.delay
 
 // ---------------------------------------------------------------------
 // TappableRollingInt : wrapper cliquable autour du compteur
-// - Avant le premier clic : affiche uniquement "------€" (placeholders).
-// - Après le clic : lance la séquence d'animation complète chiffre par chiffre.
+// - Démarre l'animation seul après 3 secondes.
+// - Au clic, exécute l'action `onTapped`.
 // ---------------------------------------------------------------------
 @Composable
 fun TappableRollingInt(
     value: Int,
     modifier: Modifier = Modifier,
-    fontSize: TextUnit = 24.sp
+    fontSize: TextUnit = 24.sp,
+    onTapped: () -> Unit // Paramètre pour l'action de clic
 ) {
-    // Indique si l’utilisateur a déjà démarré l’animation en touchant le compteur.
+    // Indique si l'animation a démarré.
     var started by remember { mutableStateOf(false) }
+
+    // Démarre l'animation automatiquement après 3 secondes.
+    // Se relance si la valeur change.
+    LaunchedEffect(value) {
+        started = false // Affiche les placeholders pendant le délai
+        delay(2000L)
+        started = true
+    }
 
     Box(
         modifier = modifier
-            // Au premier clic, on passe started à true → on lance l’animation réelle.
-            .clickable { started = true }
+            .clickable { onTapped() } // Exécute l'action de navigation au clic
     ) {
         RollingInt(
             value = value,
             fontSize = fontSize,
-            // Tant que started = false, on n’affiche que des "-" (pas d’animation).
             showPlaceholdersOnly = !started
         )
     }

@@ -107,8 +107,13 @@ fun HomeScreen(
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Résumé des soldes (inchangé)
-                BalanceSummary(accounts, balances, allTransactions, accountExtras)
+                BalanceSummary(
+                    accounts = accounts,
+                    balances = balances,
+                    allTransactions = allTransactions,
+                    accountExtras = accountExtras,
+                    onTotalTapped = { onNavigate(Screen.PieChart) } // Lier le clic à la navigation
+                )
 
                 // Liste scrollable sous le résumé
                 LazyColumn(

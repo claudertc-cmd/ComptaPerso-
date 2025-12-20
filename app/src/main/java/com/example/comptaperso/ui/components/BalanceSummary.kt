@@ -20,15 +20,15 @@ import com.example.comptaperso.data.TransactionType
  * @param balances La map des soldes pour les comptes d'épargne et d'assurance.
  * @param allTransactions L'ensemble des transactions pour tous les comptes.
  * @param accountExtras Les informations supplémentaires pour chaque compte.
+ * @param onTotalTapped L'action à exécuter lorsque le total est cliqué.
  */
-
-
 @Composable
 fun BalanceSummary(
     accounts: List<Account>,
     balances: Map<String, Double>,
     allTransactions: Map<String, List<Transaction>>,
-    accountExtras: Map<String, AccountExtraInfo>
+    accountExtras: Map<String, AccountExtraInfo>,
+    onTotalTapped: () -> Unit // Nouveau paramètre pour gérer le clic
 ) {
     val totalAll = accounts.sumOf { account ->
         when (account.type) {
@@ -52,30 +52,17 @@ fun BalanceSummary(
         }
     }
 
-    // Carte optionnelle, tu peux la remettre si tu veux un fond
-//    Card(
-//        modifier = Modifier.fillMaxWidth(),
-//        colors = CardDefaults.cardColors(
-//            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
-//        )
-//    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp), // padding réduit
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-//            Text(
-//                text = "Total des comptes",
-//                style = shadowStyle,
-//                color = MaterialTheme.colorScheme.onSurface
-//            )
-            TappableRollingInt(
-                value = totalAll.toInt(),
-                fontSize = 24.sp,              // un peu plus petit
-                modifier = Modifier
-                    .padding(top = 4.dp)      // moins de marge
-            )
-        }
-        // }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        TappableRollingInt(
+            value = totalAll.toInt(),
+            fontSize = 24.sp,
+            modifier = Modifier.padding(top = 4.dp),
+            onTapped = onTotalTapped // Passer l'action de clic
+        )
     }
+}
