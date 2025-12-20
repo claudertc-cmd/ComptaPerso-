@@ -50,6 +50,7 @@ import com.example.comptaperso.navigation.Screen
 import com.example.comptaperso.ui.account_management.AccountManagementScreen
 import com.example.comptaperso.ui.account_view.AccountViewPagerScreen
 import com.example.comptaperso.ui.home.HomeScreen
+import com.example.comptaperso.ui.pie_chart.PieChartScreen
 import com.example.comptaperso.ui.simplified_accounts.SimplifiedAccountsScreen
 import com.example.comptaperso.ui.theme.AppTheme
 import com.example.comptaperso.ui.theme.Theme
@@ -198,7 +199,8 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                     containerColor = Color.Transparent,
                     topBar = {
                         if (currentScreen !is Screen.AccountViewPager &&
-                            currentScreen !is Screen.Home
+                            currentScreen !is Screen.Home &&
+                            currentScreen !is Screen.PieChart // Ne pas montrer la barre pour le graphique
                         ) {
                             TopAppBar(
                                 title = {
@@ -331,6 +333,8 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                 },
                                 onAccountAdded = { currentScreen = Screen.Home }
                             )
+
+                            is Screen.PieChart -> PieChartScreen()
 
                             is Screen.AccountViewPager -> {
                                 val filteredAccounts = remember(accounts) {

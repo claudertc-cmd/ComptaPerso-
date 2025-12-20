@@ -58,6 +58,7 @@ dependencies {
     // Compose de base (2e app) + extras de l’originale
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
@@ -84,7 +85,7 @@ dependencies {
     implementation("androidx.annotation:annotation:1.9.1")
 
     // Firebase Firestore + autres (app originale)
-    implementation(platform("com.google.firebase:firebase-bom:33.1.0")) // [web:28]
+    implementation(platform(libs.firebase.bom))
     implementation("com.google.firebase:firebase-storage-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-auth-ktx")

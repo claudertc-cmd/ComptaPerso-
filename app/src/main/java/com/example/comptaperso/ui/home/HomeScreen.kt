@@ -279,6 +279,13 @@ fun HomeScreen(
                         .background(errorContainerLight, RoundedCornerShape(12.dp))
                 ) {
                     DropdownMenuItem(
+                        text = { Text("Répartition des actifs") },
+                        onClick = {
+                            onNavigate(Screen.PieChart)
+                            menuExpanded = false
+                        }
+                    )
+                    DropdownMenuItem(
                         text = { Text("Gérer les comptes") },
                         onClick = {
                             onNavigate(Screen.AccountManagement)
