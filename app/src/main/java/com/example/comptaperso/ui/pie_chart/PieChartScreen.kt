@@ -1,5 +1,6 @@
 package com.example.comptaperso.ui.pie_chart
 
+import android.R
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,6 +26,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.comptaperso.ui.components.RollingInt
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.min
@@ -203,11 +205,13 @@ private fun DonutChart(
                 }
             }
         }
-        Text(
-            text = "%.0f€".format(totalValue),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
+        //
+        RollingInt(value= totalValue.toInt())
+//        Text(
+//            text = "%.0f€".format(totalValue),
+//            style = MaterialTheme.typography.headlineSmall,
+//            fontWeight = FontWeight.Bold
+//        )
     }
 }
 
@@ -246,13 +250,16 @@ private fun ChartLegend(
                     Text(
                         text = group.groupName,
                         modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.titleLarge , //titre
+                        fontWeight = FontWeight.Bold,
+                        color = groupColors[groupIndex]
                     )
                     Text(
                         text = "%.0f€".format(group.totalValue),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = groupColors[groupIndex]
+
                     )
                 }
             }
@@ -279,11 +286,12 @@ private fun ChartLegend(
                     Text(
                         text = accountData.label,
                         modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyLarge
                     )
                     Text(
                         text = "%.0f€".format(accountData.value),
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.titleMedium,
+//                        color= color
                     )
                 }
             }
