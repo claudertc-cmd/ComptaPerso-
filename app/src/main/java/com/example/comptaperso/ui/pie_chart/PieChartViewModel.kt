@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 // Version simple: juste un nom et une valeur
-data class ChartData(val label: String, val value: Float)
+data class ChartData(val id: String, val label: String, val value: Float)
 
 // Nouvelle classe pour les données groupées
 data class GroupedChartData(val groupName: String, val totalValue: Float, val accounts: List<ChartData>)
@@ -37,7 +37,7 @@ class PieChartViewModel(application: Application) : AndroidViewModel(application
                             balancesMap[account.id] ?: 0.0
                         }
                     }
-                    ChartData(account.name, balance.toFloat())
+                    ChartData(account.id, account.name, balance.toFloat())
                 }.filter { it.value > 0 }
 
                 GroupedChartData(

@@ -334,7 +334,20 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                 onAccountAdded = { currentScreen = Screen.Home }
                             )
 
-                            is Screen.PieChart -> PieChartScreen()
+                            is Screen.PieChart -> PieChartScreen(
+                                onAccountClick = { accountId ->
+                                    val account = accounts.find { it.id == accountId }
+                                    if (account != null) {
+                                        val accountType = account.type
+                                        val initialIndex = accounts.filter { it.type == accountType }.indexOfFirst { it.id == accountId }
+                                        if (account.type == "Epargne" || account.type == "Assurance") {
+                                            currentScreen = Screen.SimplifiedAccounts(accountType, initialIndex)
+                                        } else {
+                                            currentScreen = Screen.AccountViewPager(accountType, initialIndex)
+                                        }
+                                    }
+                                }
+                            )
 
                             is Screen.AccountViewPager -> {
                                 val filteredAccounts = remember(accounts) {

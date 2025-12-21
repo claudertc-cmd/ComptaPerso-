@@ -2,6 +2,7 @@ package com.example.comptaperso.ui.pie_chart
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -26,7 +27,8 @@ import kotlin.math.sin
 
 @Composable
 fun PieChartScreen(
-    viewModel: PieChartViewModel = viewModel()
+    viewModel: PieChartViewModel = viewModel(),
+    onAccountClick: (String) -> Unit
 ) {
     val groupedData by viewModel.groupedData.collectAsState()
 
@@ -69,7 +71,8 @@ fun PieChartScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 groupedData = groupedData,
                 groupColors = groupColors,
-                accountColors = accountColors
+                accountColors = accountColors,
+                onAccountClick = onAccountClick
             )
         }
     } else {
@@ -149,7 +152,8 @@ private fun ChartLegend(
     modifier: Modifier = Modifier,
     groupedData: List<GroupedChartData>,
     groupColors: List<Color>,
-    accountColors: List<Color>
+    accountColors: List<Color>,
+    onAccountClick: (String) -> Unit
 ) {
     val groupAccountColorOffsets = remember(groupedData) {
         mutableListOf<Int>().apply {
@@ -197,7 +201,9 @@ private fun ChartLegend(
             ) { accountIndex, accountData ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(start = 12.dp) // Indent to align smaller dot
+                    modifier = Modifier
+                        .padding(start = 12.dp)
+                        .clickable { onAccountClick(accountData.id) } // Indent to align smaller dot
                 ) {
                     val color = accountColors.getOrElse(accountColorOffset + accountIndex) { Color.Transparent }
                     Box(
