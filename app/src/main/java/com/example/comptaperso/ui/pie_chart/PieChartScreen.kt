@@ -3,6 +3,7 @@ package com.example.comptaperso.ui.pie_chart
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -15,14 +16,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.min
 import kotlin.math.sin
 
 @Composable
@@ -52,7 +57,9 @@ fun PieChartScreen(
         }
 
         Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -64,11 +71,14 @@ fun PieChartScreen(
                 modifier = Modifier.size(220.dp),
                 groupedData = groupedData,
                 totalValue = totalValue,
-                colors = accountColors
+                colors = accountColors,
+                onAccountClick = onAccountClick
             )
             Spacer(Modifier.height(56.dp))
             ChartLegend(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 groupedData = groupedData,
                 groupColors = groupColors,
                 accountColors = accountColors,
@@ -85,12 +95,20 @@ fun PieChartScreen(
     }
 }
 
+private data class ArcLayoutInfo(
+    val accountId: String,
+    val startAngle: Float,
+    val sweepAngle: Float,
+    val groupName: String
+)
+
 @Composable
 private fun DonutChart(
     modifier: Modifier = Modifier,
     groupedData: List<GroupedChartData>,
     totalValue: Float,
-    colors: List<Color>
+    colors: List<Color>,
+    onAccountClick: (String) -> Unit
 ) {
     var startAngle = -80f
     val strokeWidth = 80.dp
@@ -98,8 +116,52 @@ private fun DonutChart(
     val categoryGapAngle = 6f
     val explosion = 10.dp
 
+    val arcLayouts = remember { mutableListOf<ArcLayoutInfo>() }
+
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
+        Canvas(modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(groupedData) { // Re-initialize when data changes
+                detectTapGestures { tapOffset ->
+                    val strokeWidthPx = strokeWidth.toPx()
+                    val chartRadius = min(size.width, size.height) / 2f
+                    val explosionPx = explosion.toPx()
+                    val canvasCenter = Offset(size.width / 2f, size.height / 2f)
+
+                    val clickedArc = arcLayouts.lastOrNull { layout ->
+                        val groupExplosion = if (layout.groupName == "Bancaire") explosionPx else 0f
+
+                        val middleAngleRad =
+                            Math.toRadians((layout.startAngle + layout.sweepAngle / 2).toDouble())
+                        val offsetX = (groupExplosion * cos(middleAngleRad)).toFloat()
+                        val offsetY = (groupExplosion * sin(middleAngleRad)).toFloat()
+
+                        val arcCenter = canvasCenter + Offset(offsetX, offsetY)
+                        val translatedTap = tapOffset - arcCenter
+
+                        val radius = translatedTap.getDistance()
+                        val isRadiusInDonut = radius in (chartRadius - strokeWidthPx)..chartRadius
+                        if (!isRadiusInDonut) return@lastOrNull false
+
+                        var tapAngle =
+                            Math
+                                .toDegrees(atan2(translatedTap.y.toDouble(), translatedTap.x.toDouble()))
+                                .toFloat()
+                        if (tapAngle < 0) tapAngle += 360f
+
+                        val normalizedStartAngle = layout.startAngle.mod(360f).let { if (it < 0f) it + 360f else it }
+
+                        var angleInArc = tapAngle - normalizedStartAngle
+                        if (angleInArc < 0) angleInArc += 360f
+
+                        angleInArc <= layout.sweepAngle
+                    }
+
+                    clickedArc?.let { onAccountClick(it.accountId) }
+                }
+            }
+        ) {
+            arcLayouts.clear()
             if (totalValue > 0f) {
                 val numAccounts = groupedData.sumOf { it.accounts.size }
                 val numCategories = groupedData.count { it.accounts.isNotEmpty() }
@@ -115,6 +177,8 @@ private fun DonutChart(
                     if (group.accounts.isNotEmpty()) {
                         group.accounts.forEachIndexed { accountIndex, account ->
                             val sweepAngle = (account.value / totalValue) * angleForData
+
+                            arcLayouts.add(ArcLayoutInfo(account.id, startAngle, sweepAngle, group.groupName))
 
                             val angleInRadians = Math.toRadians((startAngle + sweepAngle / 2).toDouble())
                             val offsetX = (groupExplosion * cos(angleInRadians)).toFloat()
