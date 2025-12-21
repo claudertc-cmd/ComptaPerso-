@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.comptaperso.ui.components.RollingInt
 import kotlin.math.atan2
@@ -206,7 +207,13 @@ private fun DonutChart(
             }
         }
         //
-        RollingInt(value= totalValue.toInt())
+        RollingInt(
+            value = totalValue.toInt(), // Votre valeur
+            fontSize = 26.sp, // Taille de police plus petite
+            showBackground = false, // Sans fond global
+            showDigitFrames = false, // Sans cadres autour des chiffres
+            showEuroSymbol = true // Masquer le symbole euro si besoin
+        )
 //        Text(
 //            text = "%.0f€".format(totalValue),
 //            style = MaterialTheme.typography.headlineSmall,
@@ -301,12 +308,13 @@ private fun ChartLegend(
 
 private fun generateColorPalettes(): List<List<Color>> {
     return listOf(
+        // Greens
+        listOf(Color(0xFF1B5E20), Color(0xFF388E3C), Color(0xFF4CAF50), Color(0xFF81C784), Color(0xFFC8E6C9)),
         // Blues
         listOf(Color(0xFF0D47A1), Color(0xFF1976D2), Color(0xFF2196F3), Color(0xFF64B5F6), Color(0xFFBBDEFB)),
         // Oranges
         listOf(Color(0xFFE65100), Color(0xFFF57C00), Color(0xFFFF9800), Color(0xFFFFB74D), Color(0xFFFFE0B2)),
-        // Greens
-        listOf(Color(0xFF1B5E20), Color(0xFF388E3C), Color(0xFF4CAF50), Color(0xFF81C784), Color(0xFFC8E6C9)),
+
         // Purples
         listOf(Color(0xFF311B92), Color(0xFF512DA8), Color(0xFF673AB7), Color(0xFF9575CD), Color(0xFFD1C4E9)),
         // Teals

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -37,7 +39,10 @@ fun TappableRollingInt(
     value: Int,
     modifier: Modifier = Modifier,
     fontSize: TextUnit = 24.sp,
-    onTapped: () -> Unit // Paramètre pour l'action de clic
+    onTapped: () -> Unit, // Paramètre pour l'action de clic
+    showBackground: Boolean = true,
+    showDigitFrames: Boolean = true,
+    showEuroSymbol: Boolean = true
 ) {
     // Indique si l'animation a démarré.
     var started by remember { mutableStateOf(false) }
@@ -57,7 +62,10 @@ fun TappableRollingInt(
         RollingInt(
             value = value,
             fontSize = fontSize,
-            showPlaceholdersOnly = !started
+            showPlaceholdersOnly = !started,
+            showBackground = showBackground,
+            showDigitFrames = showDigitFrames,
+            showEuroSymbol = showEuroSymbol
         )
     }
 }
@@ -73,7 +81,10 @@ fun RollingInt(
     value: Int,
     modifier: Modifier = Modifier,
     fontSize: TextUnit = 24.sp,
-    showPlaceholdersOnly: Boolean = false
+    showPlaceholdersOnly: Boolean = false,
+    showBackground: Boolean = true,
+    showDigitFrames: Boolean = true,
+    showEuroSymbol: Boolean = true
 ) {
     // Sécurise la valeur (évite les négatifs).
     val safeValue = value.coerceAtLeast(0)
@@ -119,14 +130,20 @@ fun RollingInt(
         currentIndexFromRight = length
     }
 
-    // Cadre global autour des rouleaux + symbole "€".
-    Box(
-        modifier = modifier
+    val containerModifier = if (showBackground) {
+        modifier
             .background(
                 color = Color.DarkGray.copy(alpha = 0.9f),
                 shape = RoundedCornerShape(12.dp)
             )
             .padding(horizontal = 4.dp, vertical = 4.dp)
+    } else {
+        modifier
+    }
+
+    // Cadre global autour des rouleaux + symbole "€".
+    Box(
+        modifier = containerModifier
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically
@@ -158,40 +175,55 @@ fun RollingInt(
                     SequencedRollingDigit(
                         target = targetDigit,
                         fontSize = fontSize,
-                        state = state
+                        state = state,
+                        showFrame = showDigitFrames
                     )
 
                     // Légère séparation horizontale entre les rouleaux.
-                    Spacer(modifier = Modifier.width(0.1.dp))
+                    if (showDigitFrames) {
+                        Spacer(modifier = Modifier.width(0.1.dp))
+                    }
                 } else {
                     // Si un jour il y avait un caractère non numérique dans text,
                     // on l’afficherait directement ici.
                     Text(
                         c.toString(),
                         fontSize = fontSize,
-                        color = Color.White
+                        color = if (showDigitFrames) Color.White else LocalContentColor.current
                     )
                 }
             }
 
-            // Petit espace avant le rouleau "€".
-            Spacer(modifier = Modifier.width(4.dp))
+            if (showEuroSymbol) {
+                // Petit espace avant le rouleau "€".
+                Spacer(modifier = Modifier.width(4.dp))
 
-            // Rouleau fixe pour le symbole "€" (pas d’animation).
-            Box(
-                modifier = Modifier
-                    .size(width = 34.dp, height = 48.dp)
-                    .shadow(5.dp, RoundedCornerShape(7.dp))
-                    .background(Color.Black, RoundedCornerShape(7.dp))
-                    .border(1.dp, Color.DarkGray, RoundedCornerShape(7.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "€",
-                    fontSize = fontSize,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                val fontSizeInDp = with(LocalDensity.current) { fontSize.toDp() }
+                val digitWidth = fontSizeInDp * 1.4f
+                val digitHeight = fontSizeInDp * 2.0f
+
+                // Rouleau fixe pour le symbole "€" (pas d’animation).
+                val euroBoxModifier = if (showDigitFrames) {
+                    Modifier
+                        .size(width = digitWidth, height = digitHeight)
+                        .shadow(5.dp, RoundedCornerShape(7.dp))
+                        .background(Color.Black, RoundedCornerShape(7.dp))
+                        .border(1.dp, Color.DarkGray, RoundedCornerShape(7.dp))
+                } else {
+                    Modifier
+                }
+
+                Box(
+                    modifier = euroBoxModifier,
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "€",
+                        fontSize = fontSize,
+                        fontWeight = FontWeight.Bold,
+                        color = if (showDigitFrames) Color.White else LocalContentColor.current
+                    )
+                }
             }
         }
     }
@@ -213,14 +245,25 @@ private enum class DigitState { PLACEHOLDER, ANIMATED, FINAL }
 private fun SequencedRollingDigit(
     target: Int,
     fontSize: TextUnit,
-    state: DigitState
+    state: DigitState,
+    showFrame: Boolean
 ) {
+    val fontSizeInDp = with(LocalDensity.current) { fontSize.toDp() }
+    val digitWidth = fontSizeInDp * 1.4f
+    val digitHeight = fontSizeInDp * 2.0f
+
     // Style commun à tous les rouleaux (digit individuel).
-    val baseModifier = Modifier
-        .size(width = 34.dp, height = 48.dp)
-        .shadow(5.dp, RoundedCornerShape(7.dp))
-        .background(Color.Black, RoundedCornerShape(7.dp))
-        .border(1.dp, Color.DarkGray, RoundedCornerShape(7.dp))
+    val baseModifier = if (showFrame) {
+        Modifier
+            .size(width = digitWidth, height = digitHeight)
+            .shadow(5.dp, RoundedCornerShape(7.dp))
+            .background(Color.Black, RoundedCornerShape(7.dp))
+            .border(1.dp, Color.DarkGray, RoundedCornerShape(7.dp))
+    } else {
+        Modifier.padding(horizontal = 1.dp)
+    }
+
+    val textColor = if (showFrame) Color.White else LocalContentColor.current
 
     when (state) {
         // 1) PLACEHOLDER : affiche juste un tiret, sans animation.
@@ -233,7 +276,7 @@ private fun SequencedRollingDigit(
                     text = "-",
                     fontSize = fontSize,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = textColor
                 )
             }
         }
@@ -248,7 +291,7 @@ private fun SequencedRollingDigit(
                     text = target.toString(),
                     fontSize = fontSize,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = textColor
                 )
             }
         }
@@ -286,7 +329,7 @@ private fun SequencedRollingDigit(
                     text = current.toString(),
                     fontSize = fontSize,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = textColor
                 )
             }
         }
