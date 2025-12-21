@@ -71,6 +71,7 @@ fun PieChartScreen(
 ) {
     val groupedData by viewModel.groupedData.collectAsState()
     var menuExpanded by remember { mutableStateOf(false) }
+    var advancedMenuExpanded by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (groupedData.isNotEmpty()) {
@@ -155,41 +156,62 @@ fun PieChartScreen(
                     }
                 )
                 HorizontalDivider()
-                DropdownMenuItem(
-                    text = { Text("Sauvegarde locale") },
-                    onClick = {
-                        onSaveToJson()
-                        menuExpanded = false
+                Box {
+                    DropdownMenuItem(
+                        text = { Text("Avancé...") },
+                        onClick = { advancedMenuExpanded = true }
+                    )
+                    DropdownMenu(
+                        expanded = advancedMenuExpanded,
+                        onDismissRequest = { advancedMenuExpanded = false },
+                        containerColor = onSurfaceVariantLight,
+                        modifier = Modifier
+                            .width(220.dp)
+                            .shadow(8.dp, RoundedCornerShape(12.dp))
+                            .background(errorContainerLight, RoundedCornerShape(12.dp))
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Sauvegarde locale") },
+                            onClick = {
+                                onSaveToJson()
+                                advancedMenuExpanded = false
+                                menuExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Restauration locale") },
+                            onClick = {
+                                onRestoreFromJson()
+                                advancedMenuExpanded = false
+                                menuExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Sauvegarde Cloud") },
+                            onClick = {
+                                onSaveToFirebase()
+                                advancedMenuExpanded = false
+                                menuExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Restauration Cloud") },
+                            onClick = {
+                                onRestoreFromFirebase()
+                                advancedMenuExpanded = false
+                                menuExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Se déconnecter") },
+                            onClick = {
+                                onLogout()
+                                advancedMenuExpanded = false
+                                menuExpanded = false
+                            }
+                        )
                     }
-                )
-                DropdownMenuItem(
-                    text = { Text("Restauration locale") },
-                    onClick = {
-                        onRestoreFromJson()
-                        menuExpanded = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Sauvegarde Cloud") },
-                    onClick = {
-                        onSaveToFirebase()
-                        menuExpanded = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Restauration Cloud") },
-                    onClick = {
-                        onRestoreFromFirebase()
-                        menuExpanded = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Se déconnecter") },
-                    onClick = {
-                        onLogout()
-                        menuExpanded = false
-                    }
-                )
+                }
             }
         }
     }
