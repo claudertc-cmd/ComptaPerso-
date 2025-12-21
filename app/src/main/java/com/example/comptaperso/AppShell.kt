@@ -143,7 +143,7 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
             }
         }
     } else {
-        var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
+        var currentScreen by remember { mutableStateOf<Screen>(Screen.PieChart) }
 
         val accounts by dataRepository.accounts.collectAsState(initial = emptyList())
         val allTransactions by dataRepository.transactions.collectAsState(initial = emptyMap())
@@ -172,8 +172,8 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
         )
 
         activity.onBackPressedDispatcher.addCallback(owner = activity) {
-            if (currentScreen !is Screen.Home) {
-                currentScreen = Screen.Home
+            if (currentScreen !is Screen.PieChart) {
+                currentScreen = Screen.PieChart
             }
         }
 
@@ -220,8 +220,8 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                     containerColor = Color.Transparent
                                 ),
                                 navigationIcon = {
-                                    if (currentScreen !is Screen.Home) {
-                                        IconButton(onClick = { currentScreen = Screen.Home }) {
+                                    if (currentScreen !is Screen.PieChart) {
+                                        IconButton(onClick = { currentScreen = Screen.PieChart }) {
                                             Icon(
                                                 Icons.AutoMirrored.Filled.ArrowBack,
                                                 contentDescription = "Retour"
@@ -235,7 +235,7 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                 ) { innerPadding ->
                     Box(
                         modifier = Modifier
-                            .padding(innerPadding) 
+                            .padding(innerPadding)
                             .fillMaxSize()
                     ) {
                         when (val screen = currentScreen) {
@@ -245,29 +245,7 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                 balances = balances,
                                 allTransactions = allTransactions,
                                 accountExtras = accountExtras,
-                                onNavigate = { currentScreen = it },
-                                onSaveToJson = {
-                                    dataRepository.saveDataToJson(
-                                        accounts,
-                                        allTransactions,
-                                        balances,
-                                        accountExtras
-                                    )
-                                },
-                                onRestoreFromJson = {
-                                    filePickerLauncher.launch("application/json")
-                                },
-                                onSaveToFirebase = {
-                                    scope.launch {
-                                        dataRepository.saveDataToFirebase()
-                                    }
-                                },
-                                onRestoreFromFirebase = {
-                                    scope.launch {
-                                        dataRepository.restoreDataFromFirebase()
-                                    }
-                                },
-                                onLogout = onLogout
+                                onNavigate = { currentScreen = it }
                             )
 
                             is Screen.AccountManagement -> AccountManagementScreen(
@@ -331,7 +309,7 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                         }
                                     }
                                 },
-                                onAccountAdded = { currentScreen = Screen.Home }
+                                onAccountAdded = { currentScreen = Screen.PieChart }
                             )
 
                             is Screen.PieChart -> PieChartScreen(
@@ -346,7 +324,30 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                             currentScreen = Screen.AccountViewPager(accountType, initialIndex)
                                         }
                                     }
-                                }
+                                },
+                                onNavigate = { currentScreen = it },
+                                onSaveToJson = {
+                                    dataRepository.saveDataToJson(
+                                        accounts,
+                                        allTransactions,
+                                        balances,
+                                        accountExtras
+                                    )
+                                },
+                                onRestoreFromJson = {
+                                    filePickerLauncher.launch("application/json")
+                                },
+                                onSaveToFirebase = {
+                                    scope.launch {
+                                        dataRepository.saveDataToFirebase()
+                                    }
+                                },
+                                onRestoreFromFirebase = {
+                                    scope.launch {
+                                        dataRepository.restoreDataFromFirebase()
+                                    }
+                                },
+                                onLogout = onLogout
                             )
 
                             is Screen.AccountViewPager -> {
@@ -380,7 +381,7 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                             dataRepository.saveAccountExtras(updatedExtras)
                                         }
                                     },
-                                    onBack = { currentScreen = Screen.Home }
+                                    onBack = { currentScreen = Screen.PieChart }
                                 )
                             }
 

@@ -1,22 +1,43 @@
 package com.example.comptaperso.ui.pie_chart
 
-import android.R
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -27,73 +48,149 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.comptaperso.navigation.Screen
 import com.example.comptaperso.ui.components.RollingInt
+import com.example.comptaperso.ui.theme.errorContainerLight
+import com.example.comptaperso.ui.theme.onSurfaceVariantLight
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PieChartScreen(
     viewModel: PieChartViewModel = viewModel(),
-    onAccountClick: (String) -> Unit
+    onAccountClick: (String) -> Unit,
+    onNavigate: (Screen) -> Unit,
+    onSaveToJson: () -> Unit,
+    onRestoreFromJson: () -> Unit,
+    onSaveToFirebase: () -> Unit,
+    onRestoreFromFirebase: () -> Unit,
+    onLogout: () -> Unit
 ) {
     val groupedData by viewModel.groupedData.collectAsState()
+    var menuExpanded by remember { mutableStateOf(false) }
 
-    if (groupedData.isNotEmpty()) {
-        val totalValue = remember(groupedData) { groupedData.sumOf { it.totalValue.toDouble() }.toFloat() }
-        val colorPalettes = remember { generateColorPalettes() }
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (groupedData.isNotEmpty()) {
+            val totalValue = remember(groupedData) { groupedData.sumOf { it.totalValue.toDouble() }.toFloat() }
+            val colorPalettes = remember { generateColorPalettes() }
 
-        val accountColors = remember(groupedData, colorPalettes) {
-            groupedData.flatMapIndexed { groupIndex, group ->
-                val palette = colorPalettes[groupIndex % colorPalettes.size]
-                group.accounts.mapIndexed { accountIndex, _ ->
-                    palette[accountIndex % palette.size]
+            val accountColors = remember(groupedData, colorPalettes) {
+                groupedData.flatMapIndexed { groupIndex, group ->
+                    val palette = colorPalettes[groupIndex % colorPalettes.size]
+                    group.accounts.mapIndexed { accountIndex, _ ->
+                        palette[accountIndex % palette.size]
+                    }
                 }
             }
-        }
 
-        val groupColors = remember(groupedData, colorPalettes) {
-            groupedData.mapIndexed { index, _ ->
-                colorPalettes[index % colorPalettes.size].first()
+            val groupColors = remember(groupedData, colorPalettes) {
+                groupedData.mapIndexed { index, _ ->
+                    colorPalettes[index % colorPalettes.size].first()
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(Modifier.height(40.dp)) // Espace pour ne pas être sous le menu
+                DonutChart(
+                    modifier = Modifier.size(220.dp),
+                    groupedData = groupedData,
+                    totalValue = totalValue,
+                    colors = accountColors,
+                    onAccountClick = onAccountClick
+                )
+                Spacer(Modifier.height(56.dp))
+                ChartLegend(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    groupedData = groupedData,
+                    groupColors = groupColors,
+                    accountColors = accountColors,
+                    onAccountClick = onAccountClick
+                )
+            }
+        } else {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = "Aucune donnée à afficher",
+                    style = MaterialTheme.typography.bodyLarge
+                )
             }
         }
 
-        Column(
+        // Menu superposé
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .align(Alignment.TopEnd)
+                .padding(top = 8.dp, end = 8.dp)
         ) {
-            Text(
-                text = "",
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(bottom = 24.dp)
-            )
-            DonutChart(
-                modifier = Modifier.size(220.dp),
-                groupedData = groupedData,
-                totalValue = totalValue,
-                colors = accountColors,
-                onAccountClick = onAccountClick
-            )
-            Spacer(Modifier.height(56.dp))
-            ChartLegend(
+            IconButton(onClick = { menuExpanded = true }) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Menu"
+                )
+            }
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false },
+                containerColor = onSurfaceVariantLight,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                groupedData = groupedData,
-                groupColors = groupColors,
-                accountColors = accountColors,
-                onAccountClick = onAccountClick
-            )
-        }
-    } else {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                text = "Aucune donnée à afficher",
-                style = MaterialTheme.typography.bodyLarge
-            )
+                    .width(220.dp)
+                    .shadow(8.dp, RoundedCornerShape(12.dp))
+                    .background(errorContainerLight, RoundedCornerShape(12.dp))
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Gérer les comptes") },
+                    onClick = {
+                        onNavigate(Screen.AccountManagement)
+                        menuExpanded = false
+                    }
+                )
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text("Sauvegarde locale") },
+                    onClick = {
+                        onSaveToJson()
+                        menuExpanded = false
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Restauration locale") },
+                    onClick = {
+                        onRestoreFromJson()
+                        menuExpanded = false
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Sauvegarde Cloud") },
+                    onClick = {
+                        onSaveToFirebase()
+                        menuExpanded = false
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Restauration Cloud") },
+                    onClick = {
+                        onRestoreFromFirebase()
+                        menuExpanded = false
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Se déconnecter") },
+                    onClick = {
+                        onLogout()
+                        menuExpanded = false
+                    }
+                )
+            }
         }
     }
 }
@@ -206,19 +303,13 @@ private fun DonutChart(
                 }
             }
         }
-        //
         RollingInt(
-            value = totalValue.toInt(), // Votre valeur
-            fontSize = 26.sp, // Taille de police plus petite
-            showBackground = false, // Sans fond global
-            showDigitFrames = false, // Sans cadres autour des chiffres
-            showEuroSymbol = true // Masquer le symbole euro si besoin
+            value = totalValue.toInt(),
+            fontSize = 26.sp,
+            showBackground = false,
+            showDigitFrames = false,
+            showEuroSymbol = true
         )
-//        Text(
-//            text = "%.0f€".format(totalValue),
-//            style = MaterialTheme.typography.headlineSmall,
-//            fontWeight = FontWeight.Bold
-//        )
     }
 }
 
@@ -257,7 +348,7 @@ private fun ChartLegend(
                     Text(
                         text = group.groupName,
                         modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.titleLarge , //titre
+                        style = MaterialTheme.typography.titleLarge, //titre
                         fontWeight = FontWeight.Bold,
                         color = groupColors[groupIndex]
                     )
@@ -321,5 +412,5 @@ private fun generateColorPalettes(): List<List<Color>> {
         listOf(Color(0xFF004D40), Color(0xFF00796B), Color(0xFF009688),  Color(0xFF4DB6AC), Color(0xFFB2DFDB)),
         // Reds
         listOf(Color(0xFFB71C1C), Color(0xFFD32F2F), Color(0xFFF44336), Color(0xFFE57373), Color(0xFFFFCDD2))
-    ) 
+    )
 }
