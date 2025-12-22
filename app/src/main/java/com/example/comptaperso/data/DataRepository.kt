@@ -14,15 +14,22 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.comptaperso.FirebaseStorageManager
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -38,6 +45,7 @@ data class AllData(
 class DataRepository(private val context: Context) {
 
     private val firebaseStorageManager = FirebaseStorageManager()
+    private val firestore = Firebase.firestore
     private val accountsKey = stringPreferencesKey("accounts")
     private val transactionsKey = stringPreferencesKey("transactions")
     private val balancesKey = stringPreferencesKey("balances")
@@ -116,16 +124,58 @@ class DataRepository(private val context: Context) {
         }
     }
 
-    fun saveDataToJson(
+    suspend fun saveBalancesToFirestore() {
+        withContext(Dispatchers.IO) {
+            try {
+                val balancesToSave = balances.first()
+                val userId = FirebaseAuth.getInstance().currentUser?.uid
+                if (userId != null) {
+                    val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                    firestore.collection("users").document(userId).collection("balances").document(date)
+                        .set(mapOf("balances" to balancesToSave))
+                        .await()
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Soldes sauvegardés sur Firestore", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Utilisateur non connecté", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("FirestoreSaveError", "Erreur de sauvegarde des soldes sur Firestore", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Erreur de sauvegarde Firestore: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    suspend fun saveDataToJson(
         accounts: List<Account>,
         allTransactions: Map<String, List<Transaction>>,
         balances: Map<String, Double>,
         accountExtras: Map<String, AccountExtraInfo>
     ) {
+        val calculatedBalances = mutableMapOf<String, Double>()
+        accounts.forEach { account ->
+            if (account.type == "Bancaire") {
+                val extras = accountExtras[account.id]
+                val provisionalBalance = extras?.provisionalBalance?.toDoubleOrNull() ?: 0.0
+                val deferredDebits = extras?.deferredDebits?.toDoubleOrNull() ?: 0.0
+                val accountTransactions = allTransactions[account.id] ?: emptyList()
+                val unpaidDebits = accountTransactions.filter { it.type == TransactionType.DEBIT && !it.isPaid }.sumOf { it.amount }
+                val unpaidCredits = accountTransactions.filter { it.type == TransactionType.CREDIT && !it.isPaid }.sumOf { it.amount }
+                calculatedBalances[account.id] = provisionalBalance - deferredDebits - unpaidDebits + unpaidCredits
+            } else {
+                calculatedBalances[account.id] = balances[account.id] ?: 0.0
+            }
+        }
+
         val allData = AllData(
             accounts = accounts,
             transactions = allTransactions,
-            balances = balances,
+            balances = calculatedBalances,
             accountExtras = accountExtras
         )
 
@@ -147,10 +197,13 @@ class DataRepository(private val context: Context) {
                 resolver.openOutputStream(uri).use { outputStream ->
                     outputStream?.write(jsonString.toByteArray())
                     Toast.makeText(context, "Sauvegarde JSON réussie dans Téléchargements", Toast.LENGTH_LONG).show()
-                } ?: throw IOException("Impossible d'ouvrir le flux de sortie pour l'URI: $uri")
+                } ?: throw IOException("Impossible d\'ouvrir le flux de sortie pour l\'URI: $uri")
             } else {
-                throw IOException("Impossible de créer l'entrée MediaStore.")
+                throw IOException("Impossible de créer l\'entrée MediaStore.")
             }
+
+            saveBalancesToFirestore()
+
         } catch (e: Exception) {
             Log.e("JsonSaveError", "Erreur lors de la sauvegarde du fichier JSON", e)
             Toast.makeText(context, "Erreur de sauvegarde JSON: ${e.message}", Toast.LENGTH_LONG).show()
@@ -191,11 +244,31 @@ class DataRepository(private val context: Context) {
     suspend fun saveDataToFirebase() {
         withContext(Dispatchers.IO) {
             try {
+                val accounts = accounts.first()
+                val allTransactions = transactions.first()
+                val balances = balances.first()
+                val accountExtras = accountExtras.first()
+
+                val calculatedBalances = mutableMapOf<String, Double>()
+                accounts.forEach { account ->
+                    if (account.type == "Bancaire") {
+                        val extras = accountExtras[account.id]
+                        val provisionalBalance = extras?.provisionalBalance?.toDoubleOrNull() ?: 0.0
+                        val deferredDebits = extras?.deferredDebits?.toDoubleOrNull() ?: 0.0
+                        val accountTransactions = allTransactions[account.id] ?: emptyList()
+                        val unpaidDebits = accountTransactions.filter { it.type == TransactionType.DEBIT && !it.isPaid }.sumOf { it.amount }
+                        val unpaidCredits = accountTransactions.filter { it.type == TransactionType.CREDIT && !it.isPaid }.sumOf { it.amount }
+                        calculatedBalances[account.id] = provisionalBalance - deferredDebits - unpaidDebits + unpaidCredits
+                    } else {
+                        calculatedBalances[account.id] = balances[account.id] ?: 0.0
+                    }
+                }
+                
                 val allData = AllData(
-                    accounts = accounts.first(),
-                    transactions = transactions.first(),
-                    balances = balances.first(),
-                    accountExtras = accountExtras.first()
+                    accounts = accounts,
+                    transactions = allTransactions,
+                    balances = calculatedBalances,
+                    accountExtras = accountExtras
                 )
                 val jsonString = Json.encodeToString(allData)
                 firebaseStorageManager.uploadData(jsonString.toByteArray(), "comptaperso_backup.json")

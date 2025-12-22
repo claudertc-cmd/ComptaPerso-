@@ -327,12 +327,14 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                 },
                                 onNavigate = { currentScreen = it },
                                 onSaveToJson = {
-                                    dataRepository.saveDataToJson(
-                                        accounts,
-                                        allTransactions,
-                                        balances,
-                                        accountExtras
-                                    )
+                                    scope.launch {
+                                        dataRepository.saveDataToJson(
+                                            accounts,
+                                            allTransactions,
+                                            balances,
+                                            accountExtras
+                                        )
+                                    }
                                 },
                                 onRestoreFromJson = {
                                     filePickerLauncher.launch("application/json")
@@ -379,6 +381,11 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                                 this[accountId] = extras
                                             }
                                             dataRepository.saveAccountExtras(updatedExtras)
+
+                                            val updatedBalances = balances.toMutableMap().apply {
+                                                this[accountId] = extras.provisionalBalance.toDoubleOrNull() ?: 0.0
+                                            }
+                                            dataRepository.saveBalances(updatedBalances)
                                         }
                                     },
                                     onBack = { currentScreen = Screen.PieChart }
