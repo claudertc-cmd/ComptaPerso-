@@ -258,37 +258,41 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                             includeDeferredDebits = includeDeferred,
                                             packageName = packageName
                                         )
-                                        dataRepository.saveAccounts(accounts + newAccount)
+                                        val updatedAccounts = accounts + newAccount
 
                                         val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+                                        val updatedExtras: Map<String, AccountExtraInfo>
+                                        val updatedBalances: Map<String, Double>
+                                        val updatedTransactions: Map<String, List<com.example.comptaperso.data.Transaction>>
+
                                         if (type == "Bancaire") {
-                                            val updatedExtras = accountExtras.toMutableMap().apply {
+                                            updatedExtras = accountExtras.toMutableMap().apply {
                                                 this[newAccount.id] = AccountExtraInfo(
                                                     provisionalBalance = "0.0",
                                                     deferredDebits = "0.0",
                                                     balanceDate = today
                                                 )
                                             }
-                                            dataRepository.saveAccountExtras(updatedExtras)
-
-                                            val updatedBalances = balances.toMutableMap().apply {
+                                            updatedBalances = balances.toMutableMap().apply {
                                                 this[newAccount.id] = 0.0
                                             }
-                                            dataRepository.saveBalances(updatedBalances)
+                                            updatedTransactions = allTransactions.toMutableMap().apply {
+                                                this[newAccount.id] = mutableListOf()
+                                            }
                                         } else {
-                                            val updatedExtras = accountExtras.toMutableMap().apply {
+                                            updatedExtras = accountExtras.toMutableMap().apply {
                                                 this[newAccount.id] = AccountExtraInfo(balanceDate = today)
                                             }
-                                            dataRepository.saveAccountExtras(updatedExtras)
+                                            updatedBalances = balances // No change for other account types
+                                            updatedTransactions = allTransactions // No change for other account types
                                         }
 
-                                        if (type != "Epargne" && type != "Assurance") {
-                                            val updatedTransactions =
-                                                allTransactions.toMutableMap().apply {
-                                                    this[newAccount.id] = mutableListOf()
-                                                }
-                                            dataRepository.saveTransactions(updatedTransactions)
-                                        }
+                                        dataRepository.saveAllData(
+                                            updatedAccounts,
+                                            updatedTransactions,
+                                            updatedBalances,
+                                            updatedExtras
+                                        )
                                     }
                                 },
                                 onUpdateAccount = { accountToUpdate ->
@@ -302,27 +306,23 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                 },
                                 onDeleteAccount = { account ->
                                     scope.launch {
-                                        dataRepository.saveAccounts(
-                                            accounts.filterNot { it.id == account.id }
-                                        )
-
+                                        val updatedAccounts = accounts.filterNot { it.id == account.id }
                                         val updatedExtras = accountExtras.toMutableMap().apply {
                                             remove(account.id)
                                         }
-                                        dataRepository.saveAccountExtras(updatedExtras)
-
-                                        if (account.type == "Epargne" || account.type == "Assurance") {
-                                            val updatedBalances = balances.toMutableMap().apply {
-                                                remove(account.id)
-                                            }
-                                            dataRepository.saveBalances(updatedBalances)
-                                        } else {
-                                            val updatedTransactions =
-                                                allTransactions.toMutableMap().apply {
-                                                    remove(account.id)
-                                                }
-                                            dataRepository.saveTransactions(updatedTransactions)
+                                        val updatedBalances = balances.toMutableMap().apply {
+                                            remove(account.id)
                                         }
+                                        val updatedTransactions = allTransactions.toMutableMap().apply {
+                                            remove(account.id)
+                                        }
+
+                                        dataRepository.saveAllData(
+                                            updatedAccounts,
+                                            updatedTransactions,
+                                            updatedBalances,
+                                            updatedExtras
+                                        )
                                     }
                                 },
                                 onAccountAdded = { currentScreen = Screen.PieChart }

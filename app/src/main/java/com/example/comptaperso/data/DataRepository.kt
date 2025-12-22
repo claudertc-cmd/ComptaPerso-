@@ -96,6 +96,20 @@ class DataRepository(private val context: Context) {
             }
         }
 
+    suspend fun saveAllData(
+        accounts: List<Account>,
+        transactions: Map<String, List<Transaction>>,
+        balances: Map<String, Double>,
+        accountExtras: Map<String, AccountExtraInfo>
+    ) {
+        context.dataStore.edit { settings ->
+            settings[accountsKey] = Json.encodeToString(accounts)
+            settings[transactionsKey] = Json.encodeToString(transactions)
+            settings[balancesKey] = Json.encodeToString(balances)
+            settings[accountExtrasKey] = Json.encodeToString(accountExtras)
+        }
+    }
+
     suspend fun saveAccounts(accounts: List<Account>) {
         context.dataStore.edit { settings ->
             val jsonString = Json.encodeToString(accounts)
@@ -232,10 +246,7 @@ class DataRepository(private val context: Context) {
 
     private suspend fun restoreData(jsonString: String) {
         val allData = Json.decodeFromString<AllData>(jsonString)
-        saveAccounts(allData.accounts)
-        saveTransactions(allData.transactions)
-        saveBalances(allData.balances)
-        saveAccountExtras(allData.accountExtras)
+        saveAllData(allData.accounts, allData.transactions, allData.balances, allData.accountExtras)
     }
 
     suspend fun saveDataToFirebase() {
