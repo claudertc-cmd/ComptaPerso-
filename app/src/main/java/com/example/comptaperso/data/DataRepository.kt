@@ -124,14 +124,21 @@ class DataRepository(private val context: Context) {
         }
     }
 
-    suspend fun saveBalancesToFirestore(balancesToSave: Map<String, Double>) {
+    suspend fun saveBalancesToFirestore(accounts: List<Account>, balancesToSave: Map<String, Double>) {
         withContext(Dispatchers.IO) {
             try {
                 val userId = FirebaseAuth.getInstance().currentUser?.uid
                 if (userId != null) {
                     val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                    val balancesWithNames = accounts.map { account ->
+                        mapOf(
+                            "id" to account.id,
+                            "name" to account.name,
+                            "balance" to (balancesToSave[account.id] ?: 0.0)
+                        )
+                    }
                     firestore.collection("users").document(userId).collection("balances").document(date)
-                        .set(mapOf("balances" to balancesToSave))
+                        .set(mapOf("balances" to balancesWithNames))
                         .await()
                 } else {
                     // User not connected
@@ -195,7 +202,7 @@ class DataRepository(private val context: Context) {
                 throw IOException("Impossible de créer l\'entrée MediaStore.")
             }
 
-            saveBalancesToFirestore(calculatedBalances)
+            saveBalancesToFirestore(accounts, calculatedBalances)
 
         } catch (e: Exception) {
             Log.e("JsonSaveError", "Erreur lors de la sauvegarde du fichier JSON", e)
@@ -263,7 +270,7 @@ class DataRepository(private val context: Context) {
                 val jsonString = Json.encodeToString(allData)
                 firebaseStorageManager.uploadData(jsonString.toByteArray(), "comptaperso_backup.json")
 
-                saveBalancesToFirestore(calculatedBalances)
+                saveBalancesToFirestore(accounts, calculatedBalances)
 
             } catch (e: Exception) {
                 Log.e("FirebaseSaveError", "Erreur de sauvegarde Firebase", e)

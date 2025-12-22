@@ -261,10 +261,26 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                         dataRepository.saveAccounts(accounts + newAccount)
 
                                         val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-                                        val updatedExtras = accountExtras.toMutableMap().apply {
-                                            this[newAccount.id] = AccountExtraInfo(balanceDate = today)
+                                        if (type == "Bancaire") {
+                                            val updatedExtras = accountExtras.toMutableMap().apply {
+                                                this[newAccount.id] = AccountExtraInfo(
+                                                    provisionalBalance = "0.0",
+                                                    deferredDebits = "0.0",
+                                                    balanceDate = today
+                                                )
+                                            }
+                                            dataRepository.saveAccountExtras(updatedExtras)
+
+                                            val updatedBalances = balances.toMutableMap().apply {
+                                                this[newAccount.id] = 0.0
+                                            }
+                                            dataRepository.saveBalances(updatedBalances)
+                                        } else {
+                                            val updatedExtras = accountExtras.toMutableMap().apply {
+                                                this[newAccount.id] = AccountExtraInfo(balanceDate = today)
+                                            }
+                                            dataRepository.saveAccountExtras(updatedExtras)
                                         }
-                                        dataRepository.saveAccountExtras(updatedExtras)
 
                                         if (type != "Epargne" && type != "Assurance") {
                                             val updatedTransactions =
