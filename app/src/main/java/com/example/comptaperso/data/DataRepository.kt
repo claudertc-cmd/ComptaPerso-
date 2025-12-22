@@ -124,23 +124,17 @@ class DataRepository(private val context: Context) {
         }
     }
 
-    suspend fun saveBalancesToFirestore() {
+    suspend fun saveBalancesToFirestore(balancesToSave: Map<String, Double>) {
         withContext(Dispatchers.IO) {
             try {
-                val balancesToSave = balances.first()
                 val userId = FirebaseAuth.getInstance().currentUser?.uid
                 if (userId != null) {
                     val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
                     firestore.collection("users").document(userId).collection("balances").document(date)
                         .set(mapOf("balances" to balancesToSave))
                         .await()
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "Soldes sauvegardés sur Firestore", Toast.LENGTH_SHORT).show()
-                    }
                 } else {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "Utilisateur non connecté", Toast.LENGTH_SHORT).show()
-                    }
+                    // User not connected
                 }
             } catch (e: Exception) {
                 Log.e("FirestoreSaveError", "Erreur de sauvegarde des soldes sur Firestore", e)
@@ -196,13 +190,12 @@ class DataRepository(private val context: Context) {
             if (uri != null) {
                 resolver.openOutputStream(uri).use { outputStream ->
                     outputStream?.write(jsonString.toByteArray())
-                    Toast.makeText(context, "Sauvegarde JSON réussie dans Téléchargements", Toast.LENGTH_LONG).show()
                 } ?: throw IOException("Impossible d\'ouvrir le flux de sortie pour l\'URI: $uri")
             } else {
                 throw IOException("Impossible de créer l\'entrée MediaStore.")
             }
 
-            saveBalancesToFirestore()
+            saveBalancesToFirestore(calculatedBalances)
 
         } catch (e: Exception) {
             Log.e("JsonSaveError", "Erreur lors de la sauvegarde du fichier JSON", e)
@@ -236,9 +229,6 @@ class DataRepository(private val context: Context) {
         saveTransactions(allData.transactions)
         saveBalances(allData.balances)
         saveAccountExtras(allData.accountExtras)
-        withContext(Dispatchers.Main) {
-            Toast.makeText(context, "Données restaurées avec succès", Toast.LENGTH_SHORT).show()
-        }
     }
 
     suspend fun saveDataToFirebase() {
@@ -272,9 +262,9 @@ class DataRepository(private val context: Context) {
                 )
                 val jsonString = Json.encodeToString(allData)
                 firebaseStorageManager.uploadData(jsonString.toByteArray(), "comptaperso_backup.json")
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "", Toast.LENGTH_SHORT).show()
-                }
+
+                saveBalancesToFirestore(calculatedBalances)
+
             } catch (e: Exception) {
                 Log.e("FirebaseSaveError", "Erreur de sauvegarde Firebase", e)
                 withContext(Dispatchers.Main) {
