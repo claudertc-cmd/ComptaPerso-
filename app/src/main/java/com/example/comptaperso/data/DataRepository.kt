@@ -279,7 +279,11 @@ class DataRepository(private val context: Context) {
                     accountExtras = accountExtras
                 )
                 val jsonString = Json.encodeToString(allData)
-                firebaseStorageManager.uploadData(jsonString.toByteArray(), "comptaperso_backup.json")
+                val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())
+                val fileName = "comptaperso_backup_$timestamp.json"
+
+                firebaseStorageManager.uploadData(jsonString.toByteArray(), fileName)
+                rotateBackups()
 
                 saveBalancesToFirestore(accounts, calculatedBalances)
 
@@ -292,12 +296,31 @@ class DataRepository(private val context: Context) {
         }
     }
 
+    private suspend fun rotateBackups() {
+        val backupFiles = firebaseStorageManager.listBackupFiles()
+            .filter { it.startsWith("comptaperso_backup_") }
+            .sortedDescending()
+
+        if (backupFiles.size > 10) {
+            val filesToDelete = backupFiles.subList(10, backupFiles.size)
+            filesToDelete.forEach { fileName ->
+                firebaseStorageManager.deleteFile(fileName)
+            }
+        }
+    }
+
     suspend fun restoreDataFromFirebase() {
         withContext(Dispatchers.IO) {
             try {
-                val data = firebaseStorageManager.downloadData("comptaperso_backup.json")
-                if (data != null) {
-                    restoreData(data.decodeToString())
+                val latestBackup = firebaseStorageManager.listBackupFiles()
+                    .filter { it.startsWith("comptaperso_backup_") }
+                    .maxOrNull()
+
+                if (latestBackup != null) {
+                    val data = firebaseStorageManager.downloadData(latestBackup)
+                    if (data != null) {
+                        restoreData(data.decodeToString())
+                    }
                 } else {
                     withContext(Dispatchers.Main) {
                         Toast.makeText(context, "Aucune sauvegarde Firebase trouvée", Toast.LENGTH_SHORT).show()

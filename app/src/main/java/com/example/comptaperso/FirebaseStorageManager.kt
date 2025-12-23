@@ -77,4 +77,25 @@ class FirebaseStorageManager {
             null
         }
     }
+
+    /**
+     * Supprime un fichier de sauvegarde par son nom.
+     */
+    suspend fun deleteFile(fileName: String) {
+        val userRef = getUserDataRef() ?: return
+        userRef.child(fileName).delete().await()
+    }
+
+    /**
+     * Liste tous les fichiers de sauvegarde existants.
+     */
+    suspend fun listBackupFiles(): List<String> {
+        val userRef = getUserDataRef() ?: return emptyList()
+        return try {
+            val result = userRef.listAll().await()
+            result.items.map { it.name }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
 }

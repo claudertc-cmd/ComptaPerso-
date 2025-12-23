@@ -38,7 +38,7 @@ class PieChartViewModel(application: Application) : AndroidViewModel(application
                         }
                     }
                     ChartData(account.id, account.name, balance.toFloat())
-                }.filter { it.value > 0 }
+                }
 
                 GroupedChartData(
                     groupName = type,
