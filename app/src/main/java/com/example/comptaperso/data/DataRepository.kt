@@ -3,7 +3,6 @@ package com.example.comptaperso.data
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
@@ -54,6 +53,9 @@ class DataRepository(private val context: Context) {
 
     private val auth = FirebaseAuth.getInstance()
     private val firestore = Firebase.firestore
+
+    // Instance Json réutilisable pour l'export avec formatage.
+    private val prettyJson = Json { prettyPrint = true }
 
     // Clés pour le DataStore.
     private val accountsKey = stringPreferencesKey("accounts")
@@ -107,7 +109,7 @@ class DataRepository(private val context: Context) {
      */
     suspend fun saveDataToJson(accounts: List<Account>, allTransactions: Map<String, List<Transaction>>, balances: Map<String, Double>, accountExtras: Map<String, AccountExtraInfo>) {
         val allData = AllData(accounts, allTransactions, balances, accountExtras)
-        val jsonString = Json { prettyPrint = true }.encodeToString(allData)
+        val jsonString = prettyJson.encodeToString(allData)
         val fileName = "comptaperso_backup_${System.currentTimeMillis()}.json"
 
         try {
@@ -115,7 +117,7 @@ class DataRepository(private val context: Context) {
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                 put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
             }
             resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)?.let {
                 resolver.openOutputStream(it)?.use { o -> o.write(jsonString.toByteArray()) }

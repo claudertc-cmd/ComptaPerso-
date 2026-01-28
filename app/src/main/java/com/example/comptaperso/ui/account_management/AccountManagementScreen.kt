@@ -62,8 +62,7 @@ fun AccountManagementScreen(
     // `accountToEdit` stocke le compte en cours de modification. Si null, le formulaire est en mode "ajout".
     var accountToEdit by remember { mutableStateOf<Account?>(null) }
 
-    // États pour gérer le dialogue de confirmation de suppression.
-    var showDeleteConfirmationDialog by remember { mutableStateOf(false) }
+    // État pour gérer le dialogue de confirmation de suppression.
     var accountToDelete by remember { mutableStateOf<Account?>(null) }
 
     // États pour les champs du formulaire.
@@ -254,10 +253,7 @@ fun AccountManagementScreen(
                         }
                         // Icône pour déclencher la suppression du compte.
                         IconButton(
-                            onClick = {
-                                accountToDelete = account
-                                showDeleteConfirmationDialog = true
-                            }
+                            onClick = { accountToDelete = account }
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = "Supprimer le compte")
                         }
@@ -279,12 +275,9 @@ fun AccountManagementScreen(
     }
 
     // Affiche le dialogue de confirmation de suppression.
-    if (showDeleteConfirmationDialog) {
+    if (accountToDelete != null) {
         AlertDialog(
-            onDismissRequest = {
-                showDeleteConfirmationDialog = false
-                accountToDelete = null
-            },
+            onDismissRequest = { accountToDelete = null },
             title = { Text("Confirmer la suppression") },
             text = {
                 Text("Êtes-vous sûr de vouloir supprimer le compte \"${accountToDelete?.name}\" ? Cette action est irréversible.")
@@ -299,7 +292,6 @@ fun AccountManagementScreen(
                                 accountToEdit = null
                             }
                         }
-                        showDeleteConfirmationDialog = false
                         accountToDelete = null
                     }
                 ) {
@@ -307,12 +299,7 @@ fun AccountManagementScreen(
                 }
             },
             dismissButton = {
-                OutlinedButton(
-                    onClick = {
-                        showDeleteConfirmationDialog = false
-                        accountToDelete = null
-                    }
-                ) {
+                OutlinedButton(onClick = { accountToDelete = null }) {
                     Text("Annuler")
                 }
             }

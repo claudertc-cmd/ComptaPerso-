@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import java.util.Locale
 
 /**
  * `TappableRollingInt` est un composant qui encapsule `RollingInt` pour le rendre cliquable
@@ -90,11 +92,11 @@ fun RollingInt(
     showEuroSymbol: Boolean = true
 ) {
     val safeValue = value.coerceAtLeast(0)
-    val text = String.format("%06d", safeValue) // Formate sur 6 chiffres.
+    val text = String.format(Locale.US, "%06d", safeValue) // Formate sur 6 chiffres.
     val length = text.length
 
     // Index de la colonne en cours d'animation (depuis la droite).
-    var currentIndexFromRight by remember { mutableStateOf(-1) }
+    var currentIndexFromRight by remember { mutableIntStateOf(-1) }
 
     // Gère la séquence d'animation colonne par colonne.
     LaunchedEffect(value, showPlaceholdersOnly) {
@@ -186,7 +188,7 @@ private fun SequencedRollingDigit(
             }
         }
         DigitState.ANIMATED -> {
-            var current by remember { mutableStateOf(0) }
+            var current by remember { mutableIntStateOf(0) }
             LaunchedEffect(target) {
                 repeat(5 * 10) { // 5 tours de 10 chiffres.
                     current = if (current == 0) 9 else current - 1
