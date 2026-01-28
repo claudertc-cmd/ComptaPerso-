@@ -11,6 +11,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
+// Définit les palettes de couleurs complètes pour chaque thème en mode clair et sombre.
+// Ces `colorScheme` sont utilisés par `MaterialTheme` pour appliquer un style cohérent à l'application.
+
+// Palette de couleurs pour le thème "Spring" en mode sombre.
 private val DarkColorScheme = darkColorScheme(
     primary = primaryDark,
     onPrimary = onPrimaryDark,
@@ -37,6 +41,7 @@ private val DarkColorScheme = darkColorScheme(
     outline = outlineDark
 )
 
+// Palette de couleurs pour le thème "Spring" en mode clair.
 private val LightColorScheme = lightColorScheme(
     primary = primaryLight,
     onPrimary = onPrimaryLight,
@@ -63,14 +68,15 @@ private val LightColorScheme = lightColorScheme(
     outline = outlineLight
 )
 
+// Palette de couleurs pour le thème "BoursoBank" en mode clair.
 private val BoursoBankColorScheme = lightColorScheme(
     primary = boursoPrimary,
     onPrimary = onBoursoPrimary,
-    primaryContainer = Color(0xFFFFD9E2),
-    onPrimaryContainer = Color(0xFF3E001D),
+    primaryContainer = Color(0xFFFFD9E2), // Conteneur rose clair
+    onPrimaryContainer = Color(0xFF3E001D), // Texte foncé sur conteneur
     secondary = boursoSecondary,
     onSecondary = onBoursoSecondary,
-    tertiary = Color(0xFF7DDA9E),
+    tertiary = Color(0xFF7DDA9E), // Touche de vert
     background = boursoBackground,
     onBackground = onBoursoBackground,
     surface = boursoSurface,
@@ -78,26 +84,28 @@ private val BoursoBankColorScheme = lightColorScheme(
     surfaceVariant = Color(0xFFF9FAFE)
 )
 
+// Palette de couleurs pour le thème "BoursoBank" en mode sombre.
 private val BoursoBankDarkColorScheme = darkColorScheme(
-    primary = boursoPrimary, // Keeping the same primary color
+    primary = boursoPrimary, // La couleur primaire reste la même
     onPrimary = onBoursoPrimary,
-    primaryContainer = Color(0xFF5A002D), // Darker container
-    onPrimaryContainer = Color(0xFFFFD9E2), // Lighter text on dark container
-    secondary = boursoSecondary, // Keeping the same secondary color
+    primaryContainer = Color(0xFF5A002D), // Conteneur plus sombre
+    onPrimaryContainer = Color(0xFFFFD9E2), // Texte clair sur conteneur
+    secondary = boursoSecondary,
     onSecondary = onBoursoSecondary,
-    tertiary = Color(0xFF7DDA9E), // Keeping the same tertiary color
-    background = Color(0xFF1C1B1F), // Dark background
-    onBackground = Color(0xFFE6E1E5), // Light text on dark background
-    surface = Color(0xFF2E2D31), // Dark surface
-    onSurface = Color(0xFFE6E1E5), // Light text on dark surface
-    surfaceVariant = Color(0xFF2E2D31) // Dark surface variant
+    tertiary = Color(0xFF7DDA9E),
+    background = Color(0xFF1C1B1F), // Fond sombre
+    onBackground = Color(0xFFE6E1E5), // Texte clair
+    surface = Color(0xFF2E2D31), // Surface sombre
+    onSurface = Color(0xFFE6E1E5),
+    surfaceVariant = Color(0xFF2E2D31)
 )
 
+// Palette de couleurs pour le thème "Fortuneo" en mode clair.
 private val FortuneoColorScheme = lightColorScheme(
     primary = fortuneoPrimary,
     onPrimary = onFortuneoPrimary,
-    primaryContainer = Color(0xFFB9F6CA), // Light Green for containers
-    onPrimaryContainer = Color(0xFF00210E), // Dark Green for text on container
+    primaryContainer = Color(0xFFB9F6CA), // Conteneur vert clair
+    onPrimaryContainer = Color(0xFF00210E), // Texte vert foncé sur conteneur
     secondary = fortuneoSecondary,
     onSecondary = onFortuneoSecondary,
     tertiary = fortuneoTertiary,
@@ -109,39 +117,53 @@ private val FortuneoColorScheme = lightColorScheme(
     surfaceVariant = Color(0xFFF5F6F8)
 )
 
+// Palette de couleurs pour le thème "Fortuneo" en mode sombre.
 private val FortuneoDarkColorScheme = darkColorScheme(
-    primary = fortuneoPrimary, // Keeping the same primary color
+    primary = fortuneoPrimary,
     onPrimary = onFortuneoPrimary,
-    primaryContainer = Color(0xFF00522A), // Darker container
-    onPrimaryContainer = Color(0xFFB9F6CA), // Lighter text on dark container
-    secondary = fortuneoSecondary, // Keeping the same secondary color
+    primaryContainer = Color(0xFF00522A), // Conteneur plus sombre
+    onPrimaryContainer = Color(0xFFB9F6CA), // Texte clair sur conteneur
+    secondary = fortuneoSecondary,
     onSecondary = onFortuneoSecondary,
-    tertiary = fortuneoTertiary, // Keeping the same tertiary color
-    background = Color(0xFF1A1C19), // Dark background
-    onBackground = Color(0xFFE2E3DD), // Light text on dark background
-    surface = Color(0xFF2E312D), // Dark surface
-    onSurface = Color(0xFFE2E3DD), // Light text on dark surface
-    surfaceVariant = Color(0xFF2E312D) // Dark surface variant
+    tertiary = fortuneoTertiary,
+    background = Color(0xFF1A1C19), // Fond sombre
+    onBackground = Color(0xFFE2E3DD), // Texte clair
+    surface = Color(0xFF2E312D), // Surface sombre
+    onSurface = Color(0xFFE2E3DD),
+    surfaceVariant = Color(0xFF2E312D)
 )
 
-
+/**
+ * Énumération des thèmes disponibles dans l'application.
+ * Permet de sélectionner un thème de manière programmatique.
+ */
 enum class Theme {
     SPRING, BOURSOBANK, FORTUNEO
 }
 
+/**
+ * `AppTheme` est le composable qui applique un thème Material à l'ensemble de l'application ou à une partie de celle-ci.
+ * Il sélectionne la palette de couleurs appropriée en fonction du thème choisi et du mode (clair/sombre).
+ *
+ * @param theme Le thème à appliquer (par défaut `Theme.SPRING`).
+ * @param darkTheme Indique si le thème sombre doit être utilisé (par défaut, basé sur les paramètres système).
+ * @param dynamicColor Indique si les couleurs dynamiques (Material You) doivent être utilisées (Android 12+).
+ * @param content Le contenu de l'interface utilisateur auquel le thème sera appliqué.
+ */
 @Composable
 fun AppTheme(
     theme: Theme = Theme.SPRING,
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
+        // Si les couleurs dynamiques sont activées et supportées.
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
+        // Sélectionne la palette de couleurs en fonction du thème et du mode (clair/sombre).
         theme == Theme.BOURSOBANK -> if (darkTheme) BoursoBankDarkColorScheme else BoursoBankColorScheme
         theme == Theme.FORTUNEO -> if (darkTheme) FortuneoDarkColorScheme else FortuneoColorScheme
         darkTheme -> DarkColorScheme
@@ -150,7 +172,7 @@ fun AppTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        // typography = AppTypography,
+        typography = Typography, // Applique la typographie définie dans `Type.kt`.
         content = content
     )
 }

@@ -19,23 +19,37 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.comptaperso.data.DataRepository
 import kotlinx.coroutines.launch
 
+/**
+ * `LoginScreen` gère l'authentification de l'utilisateur (connexion et inscription).
+ * Il affiche un formulaire de connexion ou, si l'utilisateur est déjà connecté, il affiche le `AppShell` principal.
+ *
+ * @param dataRepository L'instance de `DataRepository` utilisée pour gérer les opérations d'authentification avec Firebase.
+ * @param activity L'instance de `MainActivity` requise par `AppShell` pour gérer les callbacks du cycle de vie.
+ */
 @Composable
-fun LoginScreen(firebaseManager: FirebaseStorageManager, activity: MainActivity) {
+fun LoginScreen(dataRepository: DataRepository, activity: MainActivity) {
+    // États pour les champs de saisie de l'email et du mot de passe.
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    // État pour afficher un message d'erreur en cas d'échec de l'authentification.
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isSignedIn by remember { mutableStateOf(firebaseManager.isSignedIn()) }
+    // État pour suivre si l'utilisateur est actuellement connecté.
+    var isSignedIn by remember { mutableStateOf(dataRepository.isSignedIn()) }
+    // `CoroutineScope` pour lancer les opérations d'authentification asynchrones.
     val coroutineScope = rememberCoroutineScope()
 
+    // Condition pour afficher l'écran principal ou l'écran de connexion.
     if (isSignedIn) {
+        // Si l'utilisateur est connecté, affiche le `AppShell`.
         AppShell(activity = activity, onLogout = {
-            firebaseManager.signOut()
-            isSignedIn = false
+            dataRepository.signOut() // Déconnecte l'utilisateur.
+            isSignedIn = false // Met à jour l'état pour réafficher l'écran de connexion.
         })
     } else {
-        // Affiche les champs de connexion/inscription
+        // Si l'utilisateur n'est pas connecté, affiche le formulaire de connexion/inscription.
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.Center,
@@ -53,16 +67,20 @@ fun LoginScreen(firebaseManager: FirebaseStorageManager, activity: MainActivity)
                 onValueChange = { password = it },
                 label = { Text("Mot de passe") },
                 singleLine = true,
-                visualTransformation = PasswordVisualTransformation()
+                visualTransformation = PasswordVisualTransformation() // Masque le mot de passe.
             )
             Spacer(modifier = Modifier.height(16.dp))
+
+            // Affiche un message d'erreur s'il y en a un.
             errorMessage?.let {
                 Text(it, color = androidx.compose.ui.graphics.Color.Red)
                 Spacer(modifier = Modifier.height(8.dp))
             }
+
+            // Bouton pour la connexion.
             Button(onClick = {
                 coroutineScope.launch {
-                    val result = firebaseManager.signIn(email, password)
+                    val result = dataRepository.signIn(email, password)
                     if (result.isSuccess) {
                         isSignedIn = true
                         errorMessage = null
@@ -74,9 +92,11 @@ fun LoginScreen(firebaseManager: FirebaseStorageManager, activity: MainActivity)
                 Text("Se connecter")
             }
             Spacer(modifier = Modifier.height(8.dp))
+
+            // Bouton pour l'inscription.
             Button(onClick = {
                 coroutineScope.launch {
-                    val result = firebaseManager.signUp(email, password)
+                    val result = dataRepository.signUp(email, password)
                     if (result.isSuccess) {
                         isSignedIn = true
                         errorMessage = null

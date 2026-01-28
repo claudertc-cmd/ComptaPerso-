@@ -29,40 +29,42 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
-// ---------------------------------------------------------------------
-// TappableRollingInt : wrapper cliquable autour du compteur
-// - Démarre l'animation seul après 3 secondes.
-// - Au clic, exécute l'action `onTapped`.
-// ---------------------------------------------------------------------
+/**
+ * `TappableRollingInt` est un composant qui encapsule `RollingInt` pour le rendre cliquable
+ * et pour contrôler le démarrage de l'animation.
+ *
+ * @param value La valeur entière à afficher.
+ * @param onTapped Callback déclenché lorsque le composant est cliqué.
+ * @param modifier Modificateur pour personnaliser l'apparence.
+ * @param fontSize Taille de la police.
+ * @param showBackground Si vrai, affiche un fond sombre derrière le nombre.
+ * @param showDigitFrames Si vrai, affiche des cadres individuels pour chaque chiffre.
+ * @param showEuroSymbol Si vrai, affiche le symbole "€" à la fin.
+ */
 @Composable
 fun TappableRollingInt(
     value: Int,
     modifier: Modifier = Modifier,
     fontSize: TextUnit = 24.sp,
-    onTapped: () -> Unit, // Paramètre pour l'action de clic
+    onTapped: () -> Unit,
     showBackground: Boolean = true,
     showDigitFrames: Boolean = true,
     showEuroSymbol: Boolean = true
 ) {
-    // Indique si l'animation a démarré.
     var started by remember { mutableStateOf(false) }
 
-    // Démarre l'animation automatiquement après 3 secondes.
-    // Se relance si la valeur change.
+    // Démarre l'animation automatiquement après un délai de 2 secondes.
     LaunchedEffect(value) {
-        started = false // Affiche les placeholders pendant le délai
+        started = false // Affiche les placeholders pendant le délai.
         delay(2000L)
         started = true
     }
 
-    Box(
-        modifier = modifier
-            .clickable { onTapped() } // Exécute l'action de navigation au clic
-    ) {
+    Box(modifier = modifier.clickable { onTapped() }) {
         RollingInt(
             value = value,
             fontSize = fontSize,
-            showPlaceholdersOnly = !started,
+            showPlaceholdersOnly = !started, // Contrôle l'état de l'animation.
             showBackground = showBackground,
             showDigitFrames = showDigitFrames,
             showEuroSymbol = showEuroSymbol
@@ -70,12 +72,13 @@ fun TappableRollingInt(
     }
 }
 
-// ---------------------------------------------------------------------
-// RollingInt : compteur principal
-// - Formate la valeur sur 6 chiffres.
-// - Orchestré "colonnes" de droite à gauche (unités → dizaines → centaines…).
-// - Décide pour chaque digit s’il est en placeholder, animé, ou final.
-// ---------------------------------------------------------------------
+/**
+ * `RollingInt` est le composant principal qui affiche un nombre entier avec une animation de roulement,
+ * chiffre par chiffre, de droite à gauche.
+ *
+ * @param value La valeur à afficher.
+ * @param showPlaceholdersOnly Si vrai, n'affiche que des placeholders ("-") sans lancer l'animation.
+ */
 @Composable
 fun RollingInt(
     value: Int,
@@ -86,161 +89,75 @@ fun RollingInt(
     showDigitFrames: Boolean = true,
     showEuroSymbol: Boolean = true
 ) {
-    // Sécurise la valeur (évite les négatifs).
     val safeValue = value.coerceAtLeast(0)
-
-    // Formate la valeur sur toujours 6 digits (zéros à gauche).
-    // Exemple : 42 → "000042"
-    val text = String.format("%06d", safeValue)
+    val text = String.format("%06d", safeValue) // Formate sur 6 chiffres.
     val length = text.length
 
-    // Index de la colonne actuellement en ANIMATION, compté depuis la droite :
-    // 0 = unités, 1 = dizaines, 2 = centaines, etc.
-    // -1 = aucune colonne animée (tout en placeholder).
+    // Index de la colonne en cours d'animation (depuis la droite).
     var currentIndexFromRight by remember { mutableStateOf(-1) }
 
-    // Séquence d’animation colonne par colonne, déclenchée dès que
-    // la valeur ou le mode "placeholders seulement" change.
+    // Gère la séquence d'animation colonne par colonne.
     LaunchedEffect(value, showPlaceholdersOnly) {
-        // Si on est en mode placeholders uniquement, on ne lance pas l’animation.
         if (showPlaceholdersOnly) {
             currentIndexFromRight = -1
             return@LaunchedEffect
         }
-
-        // Petit délai avant de démarrer l'animation (cosmétique).
-        delay(200L)
-
-        // Paramètres pour chaque rouleau (digit).
-        val loops = 8          // Nombre de tours complets 9→0 pour un digit.
-        val stepDelay = 5L      // Temps (ms) entre deux changements de chiffre.
-        // Durée totale approximative d'un rouleau (10 chiffres * loops) + petite marge.
-        val perDigitDuration = loops * 10 * stepDelay + 5L
-
-        // On fait avancer currentIndexFromRight pour chaque position :
-        // i = 0 → unités, i = 1 → dizaines, etc.
+        delay(200L) // Délai cosmétique.
         for (i in 0 until length) {
             currentIndexFromRight = i
-            // On laisse le temps au rouleau courant d’achever ses tours.
-            delay(perDigitDuration)
+            delay(5 * 10 * 5L + 5L) // Durée de l'animation d'un chiffre.
         }
-
-        // À la fin, on met currentIndexFromRight au-delà de la dernière colonne
-        // pour que toutes soient considérées comme FINAL.
-        currentIndexFromRight = length
+        currentIndexFromRight = length // Marque la fin de l'animation.
     }
 
     val containerModifier = if (showBackground) {
-        modifier
-            .background(
-                color = Color.DarkGray.copy(alpha = 0.9f),
-                shape = RoundedCornerShape(12.dp)
-            )
-            .padding(horizontal = 4.dp, vertical = 4.dp)
+        modifier.background(Color.DarkGray.copy(alpha = 0.9f), RoundedCornerShape(12.dp)).padding(horizontal = 4.dp, vertical = 4.dp)
     } else {
         modifier
     }
 
-    // Cadre global autour des rouleaux + symbole "€".
-    Box(
-        modifier = containerModifier
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Pour chaque caractère de la chaîne formatée.
+    Box(modifier = containerModifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             text.forEachIndexed { index, c ->
                 if (c.isDigit()) {
-                    // Position depuis la droite : 0 = unités, 1 = dizaines, etc.
                     val positionFromRight = (length - 1) - index
                     val targetDigit = c.digitToInt()
-
-                    // Détermine l’état du digit (PLACEHOLDER, ANIMATED, FINAL)
-                    // selon l’avancement de currentIndexFromRight et du flag global.
                     val state = if (showPlaceholdersOnly) {
-                        // Mode "------" : tous les digits restent en placeholder.
                         DigitState.PLACEHOLDER
                     } else {
                         when {
-                            // Colonne déjà passée : elle doit afficher sa valeur finale.
                             positionFromRight < currentIndexFromRight -> DigitState.FINAL
-                            // Colonne en cours : elle est en animation.
                             positionFromRight == currentIndexFromRight -> DigitState.ANIMATED
-                            // Colonne pas encore atteinte : "-" (en attente).
                             else -> DigitState.PLACEHOLDER
                         }
                     }
-
-                    // Dessine un seul digit selon l’état calculé.
-                    SequencedRollingDigit(
-                        target = targetDigit,
-                        fontSize = fontSize,
-                        state = state,
-                        showFrame = showDigitFrames
-                    )
-
-                    // Légère séparation horizontale entre les rouleaux.
-                    if (showDigitFrames) {
-                        Spacer(modifier = Modifier.width(0.1.dp))
-                    }
-                } else {
-                    // Si un jour il y avait un caractère non numérique dans text,
-                    // on l’afficherait directement ici.
-                    Text(
-                        c.toString(),
-                        fontSize = fontSize,
-                        color = if (showDigitFrames) Color.White else LocalContentColor.current
-                    )
+                    SequencedRollingDigit(targetDigit, fontSize, state, showDigitFrames)
+                    if (showDigitFrames) Spacer(modifier = Modifier.width(0.1.dp))
                 }
             }
-
             if (showEuroSymbol) {
-                // Petit espace avant le rouleau "€".
                 Spacer(modifier = Modifier.width(4.dp))
-
-                val fontSizeInDp = with(LocalDensity.current) { fontSize.toDp() }
-                val digitWidth = fontSizeInDp * 1.4f
-                val digitHeight = fontSizeInDp * 2.0f
-
-                // Rouleau fixe pour le symbole "€" (pas d’animation).
+                val digitWidth = with(LocalDensity.current) { fontSize.toDp() } * 1.4f
+                val digitHeight = with(LocalDensity.current) { fontSize.toDp() } * 2.0f
                 val euroBoxModifier = if (showDigitFrames) {
-                    Modifier
-                        .size(width = digitWidth, height = digitHeight)
-                        .shadow(5.dp, RoundedCornerShape(7.dp))
-                        .background(Color.Black, RoundedCornerShape(7.dp))
-                        .border(1.dp, Color.DarkGray, RoundedCornerShape(7.dp))
+                    Modifier.size(digitWidth, digitHeight).shadow(5.dp, RoundedCornerShape(7.dp)).background(Color.Black, RoundedCornerShape(7.dp)).border(1.dp, Color.DarkGray, RoundedCornerShape(7.dp))
                 } else {
                     Modifier
                 }
-
-                Box(
-                    modifier = euroBoxModifier,
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "€",
-                        fontSize = fontSize,
-                        fontWeight = FontWeight.Bold,
-                        color = if (showDigitFrames) Color.White else LocalContentColor.current
-                    )
+                Box(euroBoxModifier, contentAlignment = Alignment.Center) {
+                    Text("€", fontSize = fontSize, fontWeight = FontWeight.Bold, color = if (showDigitFrames) Color.White else LocalContentColor.current)
                 }
             }
         }
     }
 }
 
-// ---------------------------------------------------------------------
-// États possibles pour un digit :
-// - PLACEHOLDER : tiret "-"
-// - ANIMATED : rouleau qui tourne 9→0 en boucle
-// - FINAL : chiffre cible affiché sans animation
-// ---------------------------------------------------------------------
+// États possibles pour un chiffre : placeholder ("-"), en animation, ou final.
 private enum class DigitState { PLACEHOLDER, ANIMATED, FINAL }
 
-// ---------------------------------------------------------------------
-// SequencedRollingDigit : gère l’affichage d’un seul chiffre
-// selon son état (PLACEHOLDER, ANIMATED, FINAL).
-// ---------------------------------------------------------------------
+/**
+ * `SequencedRollingDigit` gère l'affichage et l'animation d'un seul chiffre en fonction de son état.
+ */
 @Composable
 private fun SequencedRollingDigit(
     target: Int,
@@ -248,89 +165,37 @@ private fun SequencedRollingDigit(
     state: DigitState,
     showFrame: Boolean
 ) {
-    val fontSizeInDp = with(LocalDensity.current) { fontSize.toDp() }
-    val digitWidth = fontSizeInDp * 1.4f
-    val digitHeight = fontSizeInDp * 2.0f
-
-    // Style commun à tous les rouleaux (digit individuel).
+    val digitWidth = with(LocalDensity.current) { fontSize.toDp() } * 1.4f
+    val digitHeight = with(LocalDensity.current) { fontSize.toDp() } * 2.0f
     val baseModifier = if (showFrame) {
-        Modifier
-            .size(width = digitWidth, height = digitHeight)
-            .shadow(5.dp, RoundedCornerShape(7.dp))
-            .background(Color.Black, RoundedCornerShape(7.dp))
-            .border(1.dp, Color.DarkGray, RoundedCornerShape(7.dp))
+        Modifier.size(digitWidth, digitHeight).shadow(5.dp, RoundedCornerShape(7.dp)).background(Color.Black, RoundedCornerShape(7.dp)).border(1.dp, Color.DarkGray, RoundedCornerShape(7.dp))
     } else {
         Modifier.padding(horizontal = 1.dp)
     }
-
     val textColor = if (showFrame) Color.White else LocalContentColor.current
 
     when (state) {
-        // 1) PLACEHOLDER : affiche juste un tiret, sans animation.
         DigitState.PLACEHOLDER -> {
-            Box(
-                modifier = baseModifier,
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "-",
-                    fontSize = fontSize,
-                    fontWeight = FontWeight.Bold,
-                    color = textColor
-                )
+            Box(baseModifier, contentAlignment = Alignment.Center) {
+                Text("-", fontSize = fontSize, fontWeight = FontWeight.Bold, color = textColor)
             }
         }
-
-        // 2) FINAL : affiche directement le chiffre cible, sans animation.
         DigitState.FINAL -> {
-            Box(
-                modifier = baseModifier,
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = target.toString(),
-                    fontSize = fontSize,
-                    fontWeight = FontWeight.Bold,
-                    color = textColor
-                )
+            Box(baseModifier, contentAlignment = Alignment.Center) {
+                Text(target.toString(), fontSize = fontSize, fontWeight = FontWeight.Bold, color = textColor)
             }
         }
-
-        // 3) ANIMATED : boucle 9→0 plusieurs fois, puis termine sur target.
         DigitState.ANIMATED -> {
-            // Chiffre actuellement affiché sur ce rouleau.
             var current by remember { mutableStateOf(0) }
-
             LaunchedEffect(target) {
-                // Nombre de tours complets 9→0.
-                val loops = 5
-                // Délai entre deux changements de chiffre (ms).
-                val stepDelay = 20L
-
-                // Valeur de départ (peu importe, on va immédiatement la faire tourner).
-                current = 0
-
-                // Chaque tour a 10 chiffres (0→9 ou 9→0 selon la logique).
-                repeat(loops * 10) {
-                    // On décrémente : 0 → 9 → 8 → ... → 1 → 0
+                repeat(5 * 10) { // 5 tours de 10 chiffres.
                     current = if (current == 0) 9 else current - 1
-                    delay(stepDelay)
+                    delay(20L)
                 }
-
-                // À la fin de la boucle, on se cale sur la vraie valeur cible.
-                current = target
+                current = target // Termine sur le chiffre cible.
             }
-
-            Box(
-                modifier = baseModifier,
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = current.toString(),
-                    fontSize = fontSize,
-                    fontWeight = FontWeight.Bold,
-                    color = textColor
-                )
+            Box(baseModifier, contentAlignment = Alignment.Center) {
+                Text(current.toString(), fontSize = fontSize, fontWeight = FontWeight.Bold, color = textColor)
             }
         }
     }

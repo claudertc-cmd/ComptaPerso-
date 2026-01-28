@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -60,34 +61,51 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+/**
+ * `AppShell` est le composant principal de l'interface utilisateur de l'application.
+ * Il gère la navigation entre les écrans, la logique de restauration des données,
+ * et la structure globale de l'application (barre supérieure, etc.).
+ *
+ * @param activity L'instance de `MainActivity` pour gérer les callbacks du cycle de vie (ex: bouton retour).
+ * @param onLogout Callback pour gérer la déconnexion de l'utilisateur.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
+    // Gère l'affichage de l'écran de démarrage (splash screen).
     var showSplashScreen by remember { mutableStateOf(true) }
+    // Suit l'état de la restauration des données (en cours, succès, échec).
     var restoreState by remember { mutableStateOf(RestoreState.InProgress) }
-    var retryTrigger by remember { mutableStateOf(0) }
+    // Déclencheur pour relancer la restauration des données en cas d'échec.
+    var retryTrigger by remember { mutableIntStateOf(0) }
 
     val context = LocalContext.current
+    // `DataRepository` est la source de vérité unique pour les données de l'application.
     val dataRepository = remember { DataRepository(context) }
+    // `CoroutineScope` pour lancer des opérations asynchrones (ex: accès réseau).
     val scope = rememberCoroutineScope()
 
+    // `LaunchedEffect` pour la restauration des données. Se déclenche au démarrage et si `retryTrigger` change.
     LaunchedEffect(retryTrigger) {
         if (showSplashScreen) {
             restoreState = RestoreState.InProgress
             scope.launch {
-                val result = withTimeoutOrNull(30_000L) { // 30 secondes de timeout
+                // Tente de restaurer les données depuis Firebase avec un timeout de 30 secondes.
+                val result = withTimeoutOrNull(30_000L) {
                     try {
                         dataRepository.restoreDataFromFirebase()
                         RestoreState.Success
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         RestoreState.Failure
                     }
                 }
+                // Met à jour l'état de la restauration en fonction du résultat.
                 restoreState = result ?: RestoreState.Timeout
             }
         }
     }
 
+    // Une fois la restauration réussie, masque le splash screen après un court délai.
     LaunchedEffect(restoreState) {
         if (restoreState == RestoreState.Success) {
             delay(1500)
@@ -95,7 +113,9 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
         }
     }
 
+    // Affiche le splash screen ou le contenu principal de l'application.
     if (showSplashScreen) {
+        // Affiche l'écran de chargement avec différents états (en cours, échec, timeout).
         AppTheme(theme = Theme.SPRING) {
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Column(
@@ -110,6 +130,7 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                             Text("Connexion en cours...")
                         }
                         RestoreState.Success -> {
+                            // Affiche une vue vide pendant une courte période après le succès.
                             Text("")
                         }
                         RestoreState.Failure -> {
@@ -143,16 +164,18 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
             }
         }
     } else {
+        // `currentScreen` gère l'écran actuellement affiché après le splash screen.
         var currentScreen by remember { mutableStateOf<Screen>(Screen.PieChart) }
 
+        // Observe les flux de données depuis le `DataRepository`.
         val accounts by dataRepository.accounts.collectAsState(initial = emptyList())
         val allTransactions by dataRepository.transactions.collectAsState(initial = emptyMap())
         val balances by dataRepository.balances.collectAsState(initial = emptyMap())
         val accountExtras by dataRepository.accountExtras.collectAsState(initial = emptyMap())
 
-        // Sauvegarde automatique des données sur Firebase lorsque les données changent
+        // Sauvegarde automatiquement les données sur Firebase dès qu'une modification est détectée.
         LaunchedEffect(accounts, allTransactions, balances, accountExtras) {
-            // Ne sauvegarde pas l'état initial vide
+            // Ne sauvegarde pas l'état initial vide pour éviter d'écraser les données distantes.
             if (accounts.isNotEmpty() || allTransactions.isNotEmpty() || balances.isNotEmpty() || accountExtras.isNotEmpty()) {
                 scope.launch {
                     dataRepository.saveDataToFirebase()
@@ -160,6 +183,7 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
             }
         }
 
+        // Lanceur pour le sélecteur de fichiers (utilisé pour la restauration depuis un JSON).
         val filePickerLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.GetContent(),
             onResult = { uri: Uri? ->
@@ -171,23 +195,26 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
             }
         )
 
+        // Gère le bouton "retour" du système : revient à l'écran `PieChart`.
         activity.onBackPressedDispatcher.addCallback(owner = activity) {
             if (currentScreen !is Screen.PieChart) {
                 currentScreen = Screen.PieChart
             }
         }
 
-
+        // Logique de changement de thème centralisée.
         val theme = if (currentScreen is Screen.AccountViewPager) {
             val screen = currentScreen as Screen.AccountViewPager
+            // Récupère le compte actuellement affiché dans le ViewPager.
             val account = accounts.filter { it.type == screen.accountType }[screen.initialIndex]
-            if (account.name.contains("Boursobank", ignoreCase = true)) {
-                Theme.BOURSOBANK
-            } else {
-                Theme.SPRING
+            // Applique un thème spécifique basé sur le nom du compte.
+            when {
+                account.name.contains("Boursobank", ignoreCase = true) -> Theme.BOURSOBANK
+                account.name.contains("Fortuneo", ignoreCase = true) -> Theme.FORTUNEO
+                else -> Theme.SPRING
             }
         } else {
-            Theme.SPRING // Thème par défaut
+            Theme.SPRING // Thème par défaut pour tous les autres écrans.
         }
 
         AppTheme(theme = theme) {
@@ -198,9 +225,10 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                 Scaffold(
                     containerColor = Color.Transparent,
                     topBar = {
+                        // La barre supérieure est conditionnellement affichée.
                         if (currentScreen !is Screen.AccountViewPager &&
                             currentScreen !is Screen.Home &&
-                            currentScreen !is Screen.PieChart // Ne pas montrer la barre pour le graphique
+                            currentScreen !is Screen.PieChart // La TopAppBar n'est pas montrée sur certains écrans.
                         ) {
                             TopAppBar(
                                 title = {
@@ -211,7 +239,6 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                             "Assurance" -> "Comptes Assurance"
                                             else -> screen.accountType
                                         }
-
                                         else -> ""
                                     }
                                     Text(title)
@@ -220,6 +247,7 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                     containerColor = Color.Transparent
                                 ),
                                 navigationIcon = {
+                                    // Affiche une icône de retour qui ramène à l'écran `PieChart`.
                                     if (currentScreen !is Screen.PieChart) {
                                         IconButton(onClick = { currentScreen = Screen.PieChart }) {
                                             Icon(
@@ -238,6 +266,7 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                             .padding(innerPadding)
                             .fillMaxSize()
                     ) {
+                        // Le `when` détermine quel écran afficher en fonction de `currentScreen`.
                         when (val screen = currentScreen) {
 
                             is Screen.Home -> HomeScreen(
@@ -283,8 +312,8 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                             updatedExtras = accountExtras.toMutableMap().apply {
                                                 this[newAccount.id] = AccountExtraInfo(balanceDate = today)
                                             }
-                                            updatedBalances = balances // No change for other account types
-                                            updatedTransactions = allTransactions // No change for other account types
+                                            updatedBalances = balances // Pas de changement pour les autres types de comptes.
+                                            updatedTransactions = allTransactions // Pas de changement pour les autres types de comptes.
                                         }
 
                                         dataRepository.saveAllData(
@@ -334,10 +363,10 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                     if (account != null) {
                                         val accountType = account.type
                                         val initialIndex = accounts.filter { it.type == accountType }.indexOfFirst { it.id == accountId }
-                                        if (account.type == "Epargne" || account.type == "Assurance") {
-                                            currentScreen = Screen.SimplifiedAccounts(accountType, initialIndex)
+                                        currentScreen = if (account.type == "Epargne" || account.type == "Assurance") {
+                                            Screen.SimplifiedAccounts(accountType, initialIndex)
                                         } else {
-                                            currentScreen = Screen.AccountViewPager(accountType, initialIndex)
+                                            Screen.AccountViewPager(accountType, initialIndex)
                                         }
                                     }
                                 },
@@ -403,8 +432,7 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                             }
                                             dataRepository.saveBalances(updatedBalances)
                                         }
-                                    },
-                                    onBack = { currentScreen = Screen.PieChart }
+                                    }
                                 )
                             }
 

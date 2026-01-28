@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
@@ -37,7 +36,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -50,13 +48,25 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.comptaperso.navigation.Screen
 import com.example.comptaperso.ui.components.RollingInt
-import com.example.comptaperso.ui.theme.errorContainerLight
-import com.example.comptaperso.ui.theme.onSurfaceVariantLight
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
+/**
+ * `PieChartScreen` est l'écran principal qui affiche un graphique en anneau (donut chart)
+ * représentant la répartition des finances de l'utilisateur par compte et par catégorie.
+ * Il inclut également une légende détaillée et un menu pour des actions supplémentaires.
+ *
+ * @param viewModel Le ViewModel qui fournit les données pour le graphique.
+ * @param onAccountClick Callback déclenché lorsqu'un compte est cliqué (sur le graphique ou la légende).
+ * @param onNavigate Callback pour la navigation vers d'autres écrans.
+ * @param onSaveToJson Callback pour sauvegarder les données localement.
+ * @param onRestoreFromJson Callback pour restaurer les données localement.
+ * @param onSaveToFirebase Callback pour sauvegarder les données sur le cloud.
+ * @param onRestoreFromFirebase Callback pour restaurer les données depuis le cloud.
+ * @param onLogout Callback pour déconnecter l'utilisateur.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PieChartScreen(
@@ -78,6 +88,7 @@ fun PieChartScreen(
             val totalValue = remember(groupedData) { groupedData.sumOf { it.totalValue.toDouble() }.toFloat() }
             val colorPalettes = remember { generateColorPalettes() }
 
+            // Assigne une couleur à chaque compte en utilisant les palettes de couleurs.
             val accountColors = remember(groupedData, colorPalettes) {
                 groupedData.flatMapIndexed { groupIndex, group ->
                     val palette = colorPalettes[groupIndex % colorPalettes.size]
@@ -87,6 +98,7 @@ fun PieChartScreen(
                 }
             }
 
+            // Assigne une couleur à chaque groupe (catégorie) de comptes.
             val groupColors = remember(groupedData, colorPalettes) {
                 groupedData.mapIndexed { index, _ ->
                     colorPalettes[index % colorPalettes.size].first()
@@ -94,12 +106,10 @@ fun PieChartScreen(
             }
 
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
+                modifier = Modifier.fillMaxSize().padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(Modifier.height(40.dp)) // Espace pour ne pas être sous le menu
+                Spacer(Modifier.height(40.dp)) // Espace pour le menu.
                 DonutChart(
                     modifier = Modifier.size(220.dp),
                     groupedData = groupedData,
@@ -109,9 +119,7 @@ fun PieChartScreen(
                 )
                 Spacer(Modifier.height(56.dp))
                 ChartLegend(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     groupedData = groupedData,
                     groupColors = groupColors,
                     accountColors = accountColors,
@@ -119,97 +127,29 @@ fun PieChartScreen(
                 )
             }
         } else {
+            // Affiche un message si aucune donnée n'est disponible.
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = "Aucune donnée à afficher",
-                    style = MaterialTheme.typography.bodyLarge
-                )
+                Text("Aucune donnée à afficher", style = MaterialTheme.typography.bodyLarge)
             }
         }
 
-        // Menu superposé
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 8.dp, end = 8.dp)
-        ) {
+        // Menu déroulant pour les actions.
+        Box(modifier = Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 8.dp)) {
             IconButton(onClick = { menuExpanded = true }) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "Menu"
-                )
+                Icon(Icons.Default.MoreVert, "Menu")
             }
-            DropdownMenu(
-                expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false },
-                containerColor = onSurfaceVariantLight,
-                modifier = Modifier
-                    .width(220.dp)
-                    .shadow(8.dp, RoundedCornerShape(12.dp))
-                    .background(errorContainerLight, RoundedCornerShape(12.dp))
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Gérer les comptes") },
-                    onClick = {
-                        onNavigate(Screen.AccountManagement)
-                        menuExpanded = false
-                    }
-                )
+            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                DropdownMenuItem(text = { Text("Gérer les comptes") }, onClick = { onNavigate(Screen.AccountManagement); menuExpanded = false })
                 HorizontalDivider()
+                // Sous-menu pour les options avancées.
                 Box {
-                    DropdownMenuItem(
-                        text = { Text("Avancé...") },
-                        onClick = { advancedMenuExpanded = true }
-                    )
-                    DropdownMenu(
-                        expanded = advancedMenuExpanded,
-                        onDismissRequest = { advancedMenuExpanded = false },
-                        containerColor = onSurfaceVariantLight,
-                        modifier = Modifier
-                            .width(220.dp)
-                            .shadow(8.dp, RoundedCornerShape(12.dp))
-                            .background(errorContainerLight, RoundedCornerShape(12.dp))
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Sauvegarde locale") },
-                            onClick = {
-                                onSaveToJson()
-                                advancedMenuExpanded = false
-                                menuExpanded = false
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Restauration locale") },
-                            onClick = {
-                                onRestoreFromJson()
-                                advancedMenuExpanded = false
-                                menuExpanded = false
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Sauvegarde Cloud") },
-                            onClick = {
-                                onSaveToFirebase()
-                                advancedMenuExpanded = false
-                                menuExpanded = false
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Restauration Cloud") },
-                            onClick = {
-                                onRestoreFromFirebase()
-                                advancedMenuExpanded = false
-                                menuExpanded = false
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Se déconnecter") },
-                            onClick = {
-                                onLogout()
-                                advancedMenuExpanded = false
-                                menuExpanded = false
-                            }
-                        )
+                    DropdownMenuItem(text = { Text("Avancé...") }, onClick = { advancedMenuExpanded = true })
+                    DropdownMenu(expanded = advancedMenuExpanded, onDismissRequest = { advancedMenuExpanded = false }) {
+                        DropdownMenuItem(text = { Text("Sauvegarde locale") }, onClick = { onSaveToJson(); advancedMenuExpanded = false; menuExpanded = false })
+                        DropdownMenuItem(text = { Text("Restauration locale") }, onClick = { onRestoreFromJson(); advancedMenuExpanded = false; menuExpanded = false })
+                        DropdownMenuItem(text = { Text("Sauvegarde Cloud") }, onClick = { onSaveToFirebase(); advancedMenuExpanded = false; menuExpanded = false })
+                        DropdownMenuItem(text = { Text("Restauration Cloud") }, onClick = { onRestoreFromFirebase(); advancedMenuExpanded = false; menuExpanded = false })
+                        DropdownMenuItem(text = { Text("Se déconnecter") }, onClick = { onLogout(); advancedMenuExpanded = false; menuExpanded = false })
                     }
                 }
             }
@@ -217,13 +157,12 @@ fun PieChartScreen(
     }
 }
 
-private data class ArcLayoutInfo(
-    val accountId: String,
-    val startAngle: Float,
-    val sweepAngle: Float,
-    val groupName: String
-)
+// Classe de données pour stocker les informations de layout de chaque arc du graphique.
+private data class ArcLayoutInfo(val accountId: String, val startAngle: Float, val sweepAngle: Float, val groupName: String)
 
+/**
+ * Affiche le graphique en anneau.
+ */
 @Composable
 private fun DonutChart(
     modifier: Modifier = Modifier,
@@ -234,55 +173,52 @@ private fun DonutChart(
 ) {
     var startAngle = -80f
     val strokeWidth = 80.dp
-    val accountGapAngle = 0.5f
-    val categoryGapAngle = 6f
-    val explosion = 10.dp
+    val accountGapAngle = 0.5f // Espace entre les comptes.
+    val categoryGapAngle = 6f // Espace entre les catégories.
+    val explosion = 10.dp // Décalage pour la catégorie "Bancaire".
 
     val arcLayouts = remember { mutableListOf<ArcLayoutInfo>() }
 
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(groupedData) { // Re-initialize when data changes
-                detectTapGestures { tapOffset ->
-                    val strokeWidthPx = strokeWidth.toPx()
-                    val chartRadius = min(size.width, size.height) / 2f
-                    val explosionPx = explosion.toPx()
-                    val canvasCenter = Offset(size.width / 2f, size.height / 2f)
+        Canvas(modifier = Modifier.fillMaxSize().pointerInput(groupedData) { // Re-initialize when data changes
+            detectTapGestures { tapOffset ->
+                val strokeWidthPx = strokeWidth.toPx()
+                val chartRadius = min(size.width, size.height) / 2f
+                val explosionPx = explosion.toPx()
+                val canvasCenter = Offset(size.width / 2f, size.height / 2f)
 
-                    val clickedArc = arcLayouts.lastOrNull { layout ->
-                        val groupExplosion = if (layout.groupName == "Bancaire") explosionPx else 0f
+                val clickedArc = arcLayouts.lastOrNull { layout ->
+                    val groupExplosion = if (layout.groupName == "Bancaire") explosionPx else 0f
 
-                        val middleAngleRad =
-                            Math.toRadians((layout.startAngle + layout.sweepAngle / 2).toDouble())
-                        val offsetX = (groupExplosion * cos(middleAngleRad)).toFloat()
-                        val offsetY = (groupExplosion * sin(middleAngleRad)).toFloat()
+                    val middleAngleRad =
+                        Math.toRadians((layout.startAngle + layout.sweepAngle / 2).toDouble())
+                    val offsetX = (groupExplosion * cos(middleAngleRad)).toFloat()
+                    val offsetY = (groupExplosion * sin(middleAngleRad)).toFloat()
 
-                        val arcCenter = canvasCenter + Offset(offsetX, offsetY)
-                        val translatedTap = tapOffset - arcCenter
+                    val arcCenter = canvasCenter + Offset(offsetX, offsetY)
+                    val translatedTap = tapOffset - arcCenter
 
-                        val radius = translatedTap.getDistance()
-                        val isRadiusInDonut = radius in (chartRadius - strokeWidthPx)..chartRadius
-                        if (!isRadiusInDonut) return@lastOrNull false
+                    val radius = translatedTap.getDistance()
+                    val isRadiusInDonut = radius in (chartRadius - strokeWidthPx)..chartRadius
+                    if (!isRadiusInDonut) return@lastOrNull false
 
-                        var tapAngle =
-                            Math
-                                .toDegrees(atan2(translatedTap.y.toDouble(), translatedTap.x.toDouble()))
-                                .toFloat()
-                        if (tapAngle < 0) tapAngle += 360f
+                    var tapAngle =
+                        Math
+                            .toDegrees(atan2(translatedTap.y.toDouble(), translatedTap.x.toDouble()))
+                            .toFloat()
+                    if (tapAngle < 0) tapAngle += 360f
 
-                        val normalizedStartAngle = layout.startAngle.mod(360f).let { if (it < 0f) it + 360f else it }
+                    val normalizedStartAngle = layout.startAngle.mod(360f).let { if (it < 0f) it + 360f else it }
 
-                        var angleInArc = tapAngle - normalizedStartAngle
-                        if (angleInArc < 0) angleInArc += 360f
+                    var angleInArc = tapAngle - normalizedStartAngle
+                    if (angleInArc < 0) angleInArc += 360f
 
-                        angleInArc <= layout.sweepAngle
-                    }
-
-                    clickedArc?.let { onAccountClick(it.accountId) }
+                    angleInArc <= layout.sweepAngle
                 }
+
+                clickedArc?.let { onAccountClick(it.accountId) }
             }
-        ) {
+        }) {
             arcLayouts.clear()
             if (totalValue > 0f) {
                 val numAccounts = groupedData.sumOf { it.accounts.size }
@@ -325,6 +261,7 @@ private fun DonutChart(
                 }
             }
         }
+        // Affiche le total au centre du graphique.
         RollingInt(
             value = totalValue.toInt(),
             fontSize = 26.sp,
@@ -335,6 +272,9 @@ private fun DonutChart(
     }
 }
 
+/**
+ * Affiche la légende du graphique, listant les catégories et les comptes.
+ */
 @Composable
 private fun ChartLegend(
     modifier: Modifier = Modifier,
@@ -359,6 +299,7 @@ private fun ChartLegend(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         groupedData.forEachIndexed { groupIndex, group ->
+            // Affiche le titre du groupe (catégorie).
             item(key = "group_${group.groupName}") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
@@ -386,6 +327,7 @@ private fun ChartLegend(
 
             val accountColorOffset = groupAccountColorOffsets.getOrElse(groupIndex) { 0 }
 
+            // Affiche les comptes individuels de la catégorie.
             itemsIndexed(
                 items = group.accounts,
                 key = { accountIndex, account -> "account_${group.groupName}_${account.label}_$accountIndex" }

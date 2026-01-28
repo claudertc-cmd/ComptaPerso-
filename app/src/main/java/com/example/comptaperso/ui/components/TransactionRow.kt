@@ -21,11 +21,12 @@ import com.example.comptaperso.data.Transaction
 import com.example.comptaperso.data.TransactionType
 
 /**
- * Affiche une ligne pour une transaction, avec son nom, sa date, son montant et un statut (payé/non payé).
+ * `TransactionRow` est un composant qui affiche une seule ligne de transaction.
+ * Il montre le nom, la date, le montant et un statut (payé/non payé) via une checkbox.
  *
- * @param transaction La transaction à afficher.
- * @param onStatusChange Callback exécuté lorsque l'état "payé" de la transaction est modifié.
- * @param onClick Callback exécuté lorsque l'utilisateur clique sur la ligne de la transaction.
+ * @param transaction L'objet `Transaction` à afficher.
+ * @param onStatusChange Callback déclenché lorsque l'utilisateur coche ou décoche la case.
+ * @param onClick Callback déclenché lorsque l'utilisateur clique sur la ligne (pour modification).
  */
 @Composable
 fun TransactionRow(transaction: Transaction, onStatusChange: (Boolean) -> Unit, onClick: () -> Unit) {
@@ -36,7 +37,7 @@ fun TransactionRow(transaction: Transaction, onStatusChange: (Boolean) -> Unit, 
         // Case à cocher pour marquer la transaction comme payée ou non.
         Checkbox(checked = transaction.isPaid, onCheckedChange = onStatusChange)
         Spacer(Modifier.width(16.dp))
-        // Ligne cliquable contenant les détails de la transaction.
+        // Le reste de la ligne est cliquable pour ouvrir le dialogue de modification.
         Row(
             modifier = Modifier.weight(1f).clickable(onClick = onClick),
             verticalAlignment = Alignment.CenterVertically,
@@ -46,7 +47,7 @@ fun TransactionRow(transaction: Transaction, onStatusChange: (Boolean) -> Unit, 
                 Text(transaction.name, style = MaterialTheme.typography.bodyLarge)
                 Text("Le ${transaction.dayOfMonth} de chaque mois", style = MaterialTheme.typography.bodySmall)
             }
-            // Le montant est affiché avec une couleur différente pour les crédits.
+            // La couleur du montant change s'il s'agit d'un crédit.
             val color = if (transaction.type == TransactionType.CREDIT) MaterialTheme.colorScheme.tertiary else Color.Unspecified
             Text("%.2f€".format(transaction.amount), fontWeight = FontWeight.Bold, color = color)
         }

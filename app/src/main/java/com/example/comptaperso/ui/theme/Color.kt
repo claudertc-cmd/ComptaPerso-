@@ -2,7 +2,15 @@ package com.example.comptaperso.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Spring Light Theme (Fuchsia)
+// Ce fichier définit les palettes de couleurs pour les différents thèmes de l'application.
+// Chaque thème (Spring, BoursoBank, Fortuneo) a ses propres couleurs primaires, secondaires, etc.
+
+//----------------------------------------------------------------------------------
+// THÈME SPRING (Thème par défaut)
+// Inspiré par des couleurs vives et printanières.
+//----------------------------------------------------------------------------------
+
+// Couleurs pour le thème clair "Spring"
 val primaryLight = Color(0xFFD0006E)
 val onPrimaryLight = Color(0xFFFFFFFF)
 val primaryContainerLight = Color(0xFFFFD9E2)
@@ -32,7 +40,7 @@ val surfaceVariantLight = Color(0xFFF2DDE2)
 val onSurfaceVariantLight = Color(0xFF514347)
 val outlineLight = Color(0xFF837377)
 
-// Spring Dark Theme (Fuchsia)
+// Couleurs pour le thème sombre "Spring"
 val primaryDark = Color(0xFFFFB1C8)
 val onPrimaryDark = Color(0xFF650033)
 val primaryContainerDark = Color(0xFF8E004A)
@@ -62,7 +70,10 @@ val surfaceVariantDark = Color(0xFF514347)
 val onSurfaceVariantDark = Color(0xFFD5C2C6)
 val outlineDark = Color(0xFF9E8C90)
 
-// BoursoBank Theme
+//----------------------------------------------------------------------------------
+// THÈME BOURSOBANK
+// Inspiré par la charte graphique de BoursoBank (rose et bleu).
+//----------------------------------------------------------------------------------
 val boursoPrimary = Color(0xFFD20073)
 val onBoursoPrimary = Color(0xFFFFFFFF)
 val boursoSecondary = Color(0xFF003883)
@@ -72,12 +83,15 @@ val onBoursoBackground = Color(0xFF191C1A)
 val boursoSurface = Color(0xFFFFFFFF)
 val onBoursoSurface = Color(0xFF191C1A)
 
-// Fortuneo Theme
+//----------------------------------------------------------------------------------
+// THÈME FORTUNEO
+// Inspiré par la charte graphique de Fortuneo (vert et bleu).
+//----------------------------------------------------------------------------------
 val fortuneoPrimary = Color(0xFF00A36C)
 val onFortuneoPrimary = Color(0xFFFFFFFF)
 val fortuneoSecondary = Color(0xFF003366)
 val onFortuneoSecondary = Color(0xFFFFFFFF)
-val fortuneoTertiary = Color(0xFFE89D73)
+val fortuneoTertiary = Color(0xFFE89D73) // Une touche d'orangé pour la troisième couleur.
 val onFortuneoTertiary = Color(0xFFFFFFFF)
 val fortuneoBackground = Color(0xFFF5F6F8)
 val onFortuneoBackground = Color(0xFF191C1A)

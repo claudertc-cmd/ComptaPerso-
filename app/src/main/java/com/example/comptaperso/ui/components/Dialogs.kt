@@ -35,9 +35,10 @@ import com.example.comptaperso.data.TransactionType
 import java.util.UUID
 
 /**
- * Affiche une boîte de dialogue pour choisir entre l'ajout d'un crédit ou d'un débit.
+ * `ChooseActionDialog` est une boîte de dialogue qui demande à l'utilisateur de choisir
+ * entre l'ajout d'un crédit ou d'un débit.
  *
- * @param onDismiss Callback exécuté lorsque la boîte de dialogue est fermée.
+ * @param onDismiss Callback exécuté lorsque la boîte de dialogue est fermée (par le bouton "Annuler" ou en cliquant à l'extérieur).
  * @param onCredit Callback exécuté lorsque l'utilisateur choisit "Crédit".
  * @param onDebit Callback exécuté lorsque l'utilisateur choisit "Débit".
  */
@@ -62,13 +63,14 @@ fun ChooseActionDialog(
 }
 
 /**
- * Affiche une boîte de dialogue pour ajouter ou modifier une transaction.
+ * `EditTransactionDialog` est une boîte de dialogue qui permet d'ajouter ou de modifier une transaction.
+ * Le formulaire s'adapte pour l'ajout (champs vides) ou la modification (champs pré-remplis).
  *
- * @param transaction La transaction à modifier, ou null pour en ajouter une nouvelle.
- * @param transactionType Le type de transaction (crédit ou débit).
- * @param onDismiss Callback exécuté lorsque la boîte de dialogue est fermée.
- * @param onSave Callback exécuté pour sauvegarder la transaction.
- * @param onDelete Callback exécuté pour supprimer la transaction.
+ * @param transaction La transaction à modifier. Si `null`, la boîte de dialogue est en mode "ajout".
+ * @param transactionType Le type de transaction (crédit ou débit) à ajouter si `transaction` est `null`.
+ * @param onDismiss Callback pour fermer la boîte de dialogue.
+ * @param onSave Callback pour sauvegarder la transaction (nouvelle ou modifiée).
+ * @param onDelete Callback pour supprimer la transaction (uniquement en mode modification).
  */
 @Composable
 fun EditTransactionDialog(
@@ -78,35 +80,31 @@ fun EditTransactionDialog(
     onSave: (Transaction) -> Unit,
     onDelete: (Transaction) -> Unit
 ) {
-    // États pour les champs du formulaire.
+    // États pour les champs du formulaire, initialisés avec les valeurs de la transaction si elle existe.
     var name by remember(transaction) { mutableStateOf(transaction?.name ?: "") }
     var day by remember(transaction) { mutableStateOf(transaction?.dayOfMonth?.toString() ?: "1") }
     var amount by remember(transaction) { mutableStateOf(transaction?.amount?.toString() ?: "") }
-    var isEditingAmount by remember { mutableStateOf(false) }
+    var isEditingAmount by remember { mutableStateOf(false) } // Pour un formatage du montant plus agréable.
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
 
-    // Affiche le montant formaté ou brut selon si le champ est en cours d'édition.
-    val displayAmount = if (isEditingAmount) {
-        amount
-    } else {
-        "%.0f".format(amount.toDoubleOrNull() ?: 0.0)
-    }
+    // Affiche le montant formaté (ex: "120") ou brut (ex: "120.50") si le champ est en cours d'édition.
+    val displayAmount = if (isEditingAmount) amount else "%.0f".format(amount.toDoubleOrNull() ?: 0.0)
 
-    // Titre dynamique pour la boîte de dialogue.
+    // Titre dynamique de la boîte de dialogue.
     val dialogTitle = if (transaction == null) {
         if (transactionType == TransactionType.CREDIT) "Ajouter un crédit" else "Ajouter un débit"
     } else {
         if (transaction.type == TransactionType.CREDIT) "Modifier le crédit" else "Modifier le débit"
     }
 
-    // Valide les champs et sauvegarde la transaction.
+    // Fonction pour valider les entrées et sauvegarder la transaction.
     val validateAndSave = {
         val dayInt = day.toIntOrNull()
         val amountDouble = amount.toDoubleOrNull()
         if (name.isNotBlank() && dayInt != null && amountDouble != null) {
             val newTransaction = Transaction(
-                id = transaction?.id ?: UUID.randomUUID().toString(),
+                id = transaction?.id ?: UUID.randomUUID().toString(), // Utilise un nouvel ID pour une nouvelle transaction.
                 name = name,
                 dayOfMonth = dayInt,
                 amount = amountDouble,
@@ -149,9 +147,7 @@ fun EditTransactionDialog(
                     suffix = { Text("€") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); validateAndSave() }),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onFocusChanged { isEditingAmount = it.isFocused },
+                    modifier = Modifier.fillMaxWidth().onFocusChanged { isEditingAmount = it.isFocused },
                     singleLine = true,
                     textStyle = TextStyle(textAlign = TextAlign.Right)
                 )
@@ -160,7 +156,7 @@ fun EditTransactionDialog(
         confirmButton = { Button(onClick = validateAndSave) { Text("Enregistrer") } },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Affiche le bouton de suppression uniquement en mode édition.
+                // Le bouton "Supprimer" n'est visible qu'en mode édition.
                 if (transaction != null) {
                     TextButton(
                         onClick = { onDelete(transaction) },

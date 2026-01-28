@@ -8,34 +8,42 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
+import com.example.comptaperso.data.DataRepository
 import com.example.comptaperso.ui.theme.AppTheme
-import com.google.firebase.ktx.Firebase
-import com.google.firebase.ktx.initialize
 
+/**
+ * `MainActivity` est l'activité principale et le point d'entrée de l'application.
+ * Elle est responsable de la gestion de l'authentification biométrique,
+ * et de la configuration de l'interface utilisateur avec Jetpack Compose.
+ */
 class MainActivity : FragmentActivity() {
 
+    // `BiometricAuthManager` gère la logique de l'authentification biométrique.
     private val biometricAuthManager by lazy {
         BiometricAuthManager(this)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Firebase.initialize(this)
+        // Active l'affichage bord à bord pour une interface utilisateur immersive.
         enableEdgeToEdge()
 
+        // Définit le contenu de l'interface utilisateur avec Jetpack Compose.
         setContent {
             AppTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val firebaseManager = FirebaseStorageManager()
+                    // Initialise le `DataRepository` qui sert de source de vérité pour les données.
+                    val dataRepository = DataRepository(applicationContext)
 
+                    // Vérifie si l'utilisateur est déjà authentifié via la biométrie.
                     if (biometricAuthManager.isAuthenticated) {
-                        // Ton écran habituel
-                        LoginScreen(firebaseManager, this)
+                        // Si authentifié, affiche l'écran de connexion/principal.
+                        LoginScreen(dataRepository, this)
                     } else {
-                        // Écran “porte d’entrée” qui déclenche la biométrie
+                        // Sinon, affiche l'écran `BiometricGateScreen` pour demander l'authentification.
                         BiometricGateScreen(
                             onRequestAuth = { biometricAuthManager.authenticate() }
                         )

@@ -13,7 +13,6 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.example.comptaperso.FirebaseStorageManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -31,9 +30,13 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-
+// Extension pour accéder facilement au DataStore depuis le contexte de l'application.
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
+/**
+ * `AllData` est une classe de données qui encapsule l'ensemble des données de l'application.
+ * Elle est utilisée pour la sérialisation/désérialisation en JSON lors des sauvegardes et restaurations.
+ */
 @Serializable
 data class AllData(
     val accounts: List<Account>,
@@ -42,158 +45,68 @@ data class AllData(
     val accountExtras: Map<String, AccountExtraInfo>
 )
 
+/**
+ * `DataRepository` est la source de vérité unique de l'application.
+ * Il gère la persistance des données en local (via DataStore) et sur le cloud (via Firebase).
+ * Il expose les données sous forme de `Flow` pour que l'interface utilisateur puisse réagir aux changements.
+ */
 class DataRepository(private val context: Context) {
 
-    private val firebaseStorageManager = FirebaseStorageManager()
+    private val auth = FirebaseAuth.getInstance()
     private val firestore = Firebase.firestore
+
+    // Clés pour le DataStore.
     private val accountsKey = stringPreferencesKey("accounts")
     private val transactionsKey = stringPreferencesKey("transactions")
     private val balancesKey = stringPreferencesKey("balances")
     private val accountExtrasKey = stringPreferencesKey("account_extras")
 
-    val accounts: Flow<List<Account>> = context.dataStore.data
-        .map { preferences ->
-            val jsonString = preferences[accountsKey]
-            if (jsonString != null && jsonString.isNotEmpty()) {
-                Json.decodeFromString<List<Account>>(jsonString)
-            } else {
-                getSampleAccounts() // Provide sample data on first launch
-            }
-        }
+    // Expose les données sous forme de `Flow` pour une observation réactive.
+    val accounts: Flow<List<Account>> = context.dataStore.data.map { Json.decodeFromString(it[accountsKey] ?: "[]") }
+    val transactions: Flow<Map<String, List<Transaction>>> = context.dataStore.data.map { Json.decodeFromString(it[transactionsKey] ?: "{}") }
+    val balances: Flow<Map<String, Double>> = context.dataStore.data.map { Json.decodeFromString(it[balancesKey] ?: "{}") }
+    val accountExtras: Flow<Map<String, AccountExtraInfo>> = context.dataStore.data.map { Json.decodeFromString(it[accountExtrasKey] ?: "{}") }
 
-    val transactions: Flow<Map<String, List<Transaction>>> = context.dataStore.data
-        .map { preferences ->
-            val jsonString = preferences[transactionsKey]
-            if (jsonString != null && jsonString.isNotEmpty()) {
-                Json.decodeFromString<Map<String, List<Transaction>>>(jsonString)
-            } else {
-                val sampleAccounts = getSampleAccounts()
-                val sampleTransactions = mutableMapOf<String, List<Transaction>>()
-                sampleAccounts.forEach { account ->
-                    sampleTransactions[account.id] = getSampleTransactionsForAccount(account.id)
-                }
-                sampleTransactions
-            }
-        }
+    // --- Authentification --- 
+    fun isSignedIn(): Boolean = auth.currentUser != null
+    fun signOut() = auth.signOut()
+    suspend fun signIn(email: String, pass: String) = runCatching { auth.signInWithEmailAndPassword(email, pass).await() }
+    suspend fun signUp(email: String, pass: String) = runCatching { auth.createUserWithEmailAndPassword(email, pass).await() }
 
-    val balances: Flow<Map<String, Double>> = context.dataStore.data
-        .map { preferences ->
-            val jsonString = preferences[balancesKey]
-            if (jsonString != null && jsonString.isNotEmpty()) {
-                Json.decodeFromString<Map<String, Double>>(jsonString)
-            } else {
-                emptyMap()
-            }
+    /**
+     * Sauvegarde toutes les données (comptes, transactions, etc.) dans le DataStore local.
+     */
+    suspend fun saveAllData(accounts: List<Account>, transactions: Map<String, List<Transaction>>, balances: Map<String, Double>, accountExtras: Map<String, AccountExtraInfo>) {
+        context.dataStore.edit {
+            it[accountsKey] = Json.encodeToString(accounts)
+            it[transactionsKey] = Json.encodeToString(transactions)
+            it[balancesKey] = Json.encodeToString(balances)
+            it[accountExtrasKey] = Json.encodeToString(accountExtras)
         }
+    }
+    
+    // Fonctions de sauvegarde individuelle pour chaque type de données.
+    suspend fun saveAccounts(data: List<Account>) = context.dataStore.edit { it[accountsKey] = Json.encodeToString(data) }
+    suspend fun saveTransactions(data: Map<String, List<Transaction>>) = context.dataStore.edit { it[transactionsKey] = Json.encodeToString(data) }
+    suspend fun saveBalances(data: Map<String, Double>) = context.dataStore.edit { it[balancesKey] = Json.encodeToString(data) }
+    suspend fun saveAccountExtras(data: Map<String, AccountExtraInfo>) = context.dataStore.edit { it[accountExtrasKey] = Json.encodeToString(data) }
 
-    val accountExtras: Flow<Map<String, AccountExtraInfo>> = context.dataStore.data
-        .map { preferences ->
-            val jsonString = preferences[accountExtrasKey]
-            if (jsonString != null && jsonString.isNotEmpty()) {
-                Json.decodeFromString<Map<String, AccountExtraInfo>>(jsonString)
-            } else {
-                emptyMap()
-            }
-        }
-
-    suspend fun saveAllData(
-        accounts: List<Account>,
-        transactions: Map<String, List<Transaction>>,
-        balances: Map<String, Double>,
-        accountExtras: Map<String, AccountExtraInfo>
-    ) {
-        context.dataStore.edit { settings ->
-            settings[accountsKey] = Json.encodeToString(accounts)
-            settings[transactionsKey] = Json.encodeToString(transactions)
-            settings[balancesKey] = Json.encodeToString(balances)
-            settings[accountExtrasKey] = Json.encodeToString(accountExtras)
+    /**
+     * Sauvegarde les soldes actuels sur Firestore pour un suivi historique.
+     */
+    suspend fun saveBalancesToFirestore(accounts: List<Account>, balancesToSave: Map<String, Double>) = withContext(Dispatchers.IO) {
+        auth.currentUser?.uid?.let {
+            val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val data = accounts.map { acc -> mapOf("id" to acc.id, "name" to acc.name, "balance" to (balancesToSave[acc.id] ?: 0.0)) }
+            firestore.collection("users").document(it).collection("balances").document(date).set(mapOf("balances" to data)).await()
         }
     }
 
-    suspend fun saveAccounts(accounts: List<Account>) {
-        context.dataStore.edit { settings ->
-            val jsonString = Json.encodeToString(accounts)
-            settings[accountsKey] = jsonString
-        }
-    }
-
-    suspend fun saveTransactions(transactions: Map<String, List<Transaction>>) {
-        context.dataStore.edit { settings ->
-            val jsonString = Json.encodeToString(transactions)
-            settings[transactionsKey] = jsonString
-        }
-    }
-
-    suspend fun saveBalances(balances: Map<String, Double>) {
-        context.dataStore.edit { settings ->
-            val jsonString = Json.encodeToString(balances)
-            settings[balancesKey] = jsonString
-        }
-    }
-
-    suspend fun saveAccountExtras(accountExtras: Map<String, AccountExtraInfo>) {
-        context.dataStore.edit { settings ->
-            val jsonString = Json.encodeToString(accountExtras)
-            settings[accountExtrasKey] = jsonString
-        }
-    }
-
-    suspend fun saveBalancesToFirestore(accounts: List<Account>, balancesToSave: Map<String, Double>) {
-        withContext(Dispatchers.IO) {
-            try {
-                val userId = FirebaseAuth.getInstance().currentUser?.uid
-                if (userId != null) {
-                    val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                    val balancesWithNames = accounts.map { account ->
-                        mapOf(
-                            "id" to account.id,
-                            "name" to account.name,
-                            "balance" to (balancesToSave[account.id] ?: 0.0)
-                        )
-                    }
-                    firestore.collection("users").document(userId).collection("balances").document(date)
-                        .set(mapOf("balances" to balancesWithNames))
-                        .await()
-                } else {
-                    // User not connected
-                }
-            } catch (e: Exception) {
-                Log.e("FirestoreSaveError", "Erreur de sauvegarde des soldes sur Firestore", e)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Erreur de sauvegarde Firestore: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-            }
-        }
-    }
-
-    suspend fun saveDataToJson(
-        accounts: List<Account>,
-        allTransactions: Map<String, List<Transaction>>,
-        balances: Map<String, Double>,
-        accountExtras: Map<String, AccountExtraInfo>
-    ) {
-        val calculatedBalances = mutableMapOf<String, Double>()
-        accounts.forEach { account ->
-            if (account.type == "Bancaire") {
-                val extras = accountExtras[account.id]
-                val provisionalBalance = extras?.provisionalBalance?.toDoubleOrNull() ?: 0.0
-                val deferredDebits = extras?.deferredDebits?.toDoubleOrNull() ?: 0.0
-                val accountTransactions = allTransactions[account.id] ?: emptyList()
-                val unpaidDebits = accountTransactions.filter { it.type == TransactionType.DEBIT && !it.isPaid }.sumOf { it.amount }
-                val unpaidCredits = accountTransactions.filter { it.type == TransactionType.CREDIT && !it.isPaid }.sumOf { it.amount }
-                calculatedBalances[account.id] = provisionalBalance - deferredDebits - unpaidDebits + unpaidCredits
-            } else {
-                calculatedBalances[account.id] = balances[account.id] ?: 0.0
-            }
-        }
-
-        val allData = AllData(
-            accounts = accounts,
-            transactions = allTransactions,
-            balances = calculatedBalances,
-            accountExtras = accountExtras
-        )
-
+    /**
+     * Sauvegarde l'intégralité des données de l'application dans un fichier JSON local (dans le dossier Téléchargements).
+     */
+    suspend fun saveDataToJson(accounts: List<Account>, allTransactions: Map<String, List<Transaction>>, balances: Map<String, Double>, accountExtras: Map<String, AccountExtraInfo>) {
+        val allData = AllData(accounts, allTransactions, balances, accountExtras)
         val jsonString = Json { prettyPrint = true }.encodeToString(allData)
         val fileName = "comptaperso_backup_${System.currentTimeMillis()}.json"
 
@@ -202,176 +115,70 @@ class DataRepository(private val context: Context) {
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                 put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
             }
+            resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)?.let {
+                resolver.openOutputStream(it)?.use { o -> o.write(jsonString.toByteArray()) }
+            } ?: throw IOException("Impossible de créer l'entrée MediaStore.")
 
-            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
-            if (uri != null) {
-                resolver.openOutputStream(uri).use { outputStream ->
-                    outputStream?.write(jsonString.toByteArray())
-                } ?: throw IOException("Impossible d\'ouvrir le flux de sortie pour l\'URI: $uri")
-            } else {
-                throw IOException("Impossible de créer l\'entrée MediaStore.")
-            }
-
-            saveBalancesToFirestore(accounts, calculatedBalances)
-
+            saveBalancesToFirestore(accounts, balances) // Sauvegarde aussi l'historique sur Firestore.
         } catch (e: Exception) {
             Log.e("JsonSaveError", "Erreur lors de la sauvegarde du fichier JSON", e)
-            Toast.makeText(context, "Erreur de sauvegarde JSON: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
-    suspend fun restoreDataFromJson(uri: Uri) {
-        withContext(Dispatchers.IO) {
+    /**
+     * Restaure les données de l'application à partir d'un fichier JSON local.
+     */
+    suspend fun restoreDataFromJson(uri: Uri) = withContext(Dispatchers.IO) {
+        try {
+            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }?.let { restoreData(it) }
+        } catch (e: Exception) {
+            Log.e("JsonRestoreError", "Erreur de restauration JSON", e)
+        }
+    }
+
+    /**
+     * Sauvegarde les données actuelles sur Firebase Storage.
+     */
+    suspend fun saveDataToFirebase() = withContext(Dispatchers.IO) {
+        auth.currentUser?.uid?.let {
             try {
-                val jsonString = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-                if (jsonString != null) {
-                    restoreData(jsonString)
-                } else {
-                     withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "Impossible de lire le fichier", Toast.LENGTH_SHORT).show()
-                    }
-                }
+                val data = AllData(accounts.first(), transactions.first(), balances.first(), accountExtras.first())
+                val jsonString = Json.encodeToString(data)
+                firestore.collection("users").document(it).set(data).await()
             } catch (e: Exception) {
-                Log.e("JsonRestoreError", "Erreur de restauration", e)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Erreur: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+                Log.e("FirebaseSaveError", "Erreur de sauvegarde sur Firestore", e)
             }
         }
     }
 
+    /**
+     * Restaure les données depuis Firebase Storage.
+     */
+    suspend fun restoreDataFromFirebase() = withContext(Dispatchers.IO) {
+        auth.currentUser?.uid?.let {
+            try {
+                val doc = firestore.collection("users").document(it).get().await()
+                if (doc.exists()) {
+                    val data = doc.toObject(AllData::class.java)
+                    if (data != null) saveAllData(data.accounts, data.transactions, data.balances, data.accountExtras)
+                }
+            } catch (e: Exception) {
+                Log.e("FirebaseRestoreError", "Erreur de restauration depuis Firestore", e)
+            }
+        }
+    }
+
+    /**
+     * Logique interne pour mettre à jour le DataStore avec les données désérialisées.
+     */
     private suspend fun restoreData(jsonString: String) {
-        val allData = Json.decodeFromString<AllData>(jsonString)
-        saveAllData(allData.accounts, allData.transactions, allData.balances, allData.accountExtras)
-    }
-
-    suspend fun saveDataToFirebase() {
-        withContext(Dispatchers.IO) {
-            try {
-                val accounts = accounts.first()
-                val allTransactions = transactions.first()
-                val balances = balances.first()
-                val accountExtras = accountExtras.first()
-
-                val calculatedBalances = mutableMapOf<String, Double>()
-                accounts.forEach { account ->
-                    if (account.type == "Bancaire") {
-                        val extras = accountExtras[account.id]
-                        val provisionalBalance = extras?.provisionalBalance?.toDoubleOrNull() ?: 0.0
-                        val deferredDebits = extras?.deferredDebits?.toDoubleOrNull() ?: 0.0
-                        val accountTransactions = allTransactions[account.id] ?: emptyList()
-                        val unpaidDebits = accountTransactions.filter { it.type == TransactionType.DEBIT && !it.isPaid }.sumOf { it.amount }
-                        val unpaidCredits = accountTransactions.filter { it.type == TransactionType.CREDIT && !it.isPaid }.sumOf { it.amount }
-                        calculatedBalances[account.id] = provisionalBalance - deferredDebits - unpaidDebits + unpaidCredits
-                    } else {
-                        calculatedBalances[account.id] = balances[account.id] ?: 0.0
-                    }
-                }
-                
-                val allData = AllData(
-                    accounts = accounts,
-                    transactions = allTransactions,
-                    balances = calculatedBalances,
-                    accountExtras = accountExtras
-                )
-                val jsonString = Json.encodeToString(allData)
-                val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())
-                val fileName = "comptaperso_backup_$timestamp.json"
-
-                firebaseStorageManager.uploadData(jsonString.toByteArray(), fileName)
-                rotateBackups()
-
-                saveBalancesToFirestore(accounts, calculatedBalances)
-
-            } catch (e: Exception) {
-                Log.e("FirebaseSaveError", "Erreur de sauvegarde Firebase", e)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Erreur de sauvegarde Firebase: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-            }
+        try {
+            val allData = Json.decodeFromString<AllData>(jsonString)
+            saveAllData(allData.accounts, allData.transactions, allData.balances, allData.accountExtras)
+        } catch (e: Exception) {
+            Log.e("DataRestoreError", "Erreur de désérialisation", e)
         }
-    }
-
-    private suspend fun rotateBackups() {
-        val backupFiles = firebaseStorageManager.listBackupFiles()
-            .filter { it.startsWith("comptaperso_backup_") }
-            .sortedDescending()
-
-        if (backupFiles.size > 10) {
-            val filesToDelete = backupFiles.subList(10, backupFiles.size)
-            filesToDelete.forEach { fileName ->
-                firebaseStorageManager.deleteFile(fileName)
-            }
-        }
-    }
-
-    suspend fun restoreDataFromFirebase() {
-        withContext(Dispatchers.IO) {
-            try {
-                val latestBackup = firebaseStorageManager.listBackupFiles()
-                    .filter { it.startsWith("comptaperso_backup_") }
-                    .maxOrNull()
-
-                if (latestBackup != null) {
-                    val data = firebaseStorageManager.downloadData(latestBackup)
-                    if (data != null) {
-                        restoreData(data.decodeToString())
-                    }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "Aucune sauvegarde Firebase trouvée", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("FirebaseRestoreError", "Erreur de restauration Firebase", e)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Erreur de restauration Firebase: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-            }
-        }
-    }
-}
-
-// Sample Data
-fun getSampleAccounts(): List<Account> {
-    return listOf(
-        Account(id = "1", name = "Compte Courant", type = "Bancaire", packageName = "com.boursorama.android"),
-        Account(id = "2", name = "Livret A", type = "Epargne", packageName = "com.creditagricole.particuliers")
-    )
-}
-
-fun getSampleTransactionsForAccount(accountId: String): MutableList<Transaction> {
-    return when (accountId) {
-        "1" -> mutableListOf(
-            Transaction(
-                name = "Loyer",
-                dayOfMonth = 1,
-                amount = 750.0,
-                type = TransactionType.DEBIT
-            ),
-            Transaction(
-                name = "Salaire",
-                dayOfMonth = 25,
-                amount = 2000.0,
-                type = TransactionType.CREDIT
-            ),
-            Transaction(
-                name = "Internet",
-                dayOfMonth = 5,
-                amount = 30.0,
-                type = TransactionType.DEBIT
-            ),
-            Transaction(
-                name = "Téléphone",
-                dayOfMonth = 15,
-                amount = 20.0,
-                type = TransactionType.DEBIT
-            )
-        )
-        else -> mutableListOf()
     }
 }

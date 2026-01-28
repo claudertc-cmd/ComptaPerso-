@@ -68,6 +68,7 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation("androidx.compose.ui:ui-text-google-fonts")
     implementation(libs.androidx.compose.animation.core)
+    implementation("androidx.compose.foundation:foundation")
 
     // Biometric EXACTEMENT comme dans l’app de test
     implementation("androidx.biometric:biometric:1.2.0-alpha05")

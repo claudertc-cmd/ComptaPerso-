@@ -41,13 +41,15 @@ import com.example.comptaperso.data.Account
 import com.example.comptaperso.ui.components.AppPicker
 
 /**
- * Écran de gestion des comptes, permettant d'ajouter, modifier et supprimer des comptes.
+ * `AccountManagementScreen` est un écran qui permet aux utilisateurs de gérer leurs comptes.
+ * Il offre des fonctionnalités pour ajouter, modifier et supprimer des comptes.
+ * L'écran affiche un formulaire pour l'ajout/modification et une liste des comptes existants.
  *
- * @param accounts La liste des comptes existants.
- * @param onAddAccount Callback pour ajouter un nouveau compte.
- * @param onUpdateAccount Callback pour mettre à jour un compte existant.
- * @param onDeleteAccount Callback pour supprimer un compte.
- * @param onAccountAdded Callback pour naviguer vers l'écran précédent (popBackStack).
+ * @param accounts La liste actuelle des comptes de l'utilisateur.
+ * @param onAddAccount Callback déclenché pour ajouter un nouveau compte.
+ * @param onUpdateAccount Callback déclenché pour mettre à jour un compte existant.
+ * @param onDeleteAccount Callback déclenché pour supprimer un compte.
+ * @param onAccountAdded Callback déclenché après l'ajout ou la modification d'un compte pour revenir à l'écran précédent.
  */
 @Composable
 fun AccountManagementScreen(
@@ -57,26 +59,34 @@ fun AccountManagementScreen(
     onDeleteAccount: (Account) -> Unit,
     onAccountAdded: () -> Unit
 ) {
+    // `accountToEdit` stocke le compte en cours de modification. Si null, le formulaire est en mode "ajout".
     var accountToEdit by remember { mutableStateOf<Account?>(null) }
 
+    // États pour gérer le dialogue de confirmation de suppression.
     var showDeleteConfirmationDialog by remember { mutableStateOf(false) }
     var accountToDelete by remember { mutableStateOf<Account?>(null) }
 
+    // États pour les champs du formulaire.
     var accountName by remember { mutableStateOf("") }
     val accountTypes = listOf("Bancaire", "Epargne", "Assurance", "Paypal", "Carte de Crédit")
     var selectedAccountType by remember { mutableStateOf(accountTypes.first()) }
-    var includeDeferred by remember { mutableStateOf(false) }
-    var packageName by remember { mutableStateOf("") }
-    val context = LocalContext.current
-    var showAppPicker by remember { mutableStateOf(false) }
+    var includeDeferred by remember { mutableStateOf(false) } // Option pour les comptes bancaires.
+    var packageName by remember { mutableStateOf("") } // Nom du package de l'application associée.
+    var showAppPicker by remember { mutableStateOf(false) } // Gère l'affichage du sélecteur d'applications.
 
+    val context = LocalContext.current
+
+    // `LaunchedEffect` qui s'exécute lorsque `accountToEdit` change.
+    // Il pré-remplit le formulaire lorsque l'utilisateur choisit de modifier un compte.
     LaunchedEffect(accountToEdit) {
         if (accountToEdit != null) {
+            // Mode "modification" : remplit les champs avec les données du compte.
             accountName = accountToEdit!!.name
             selectedAccountType = accountToEdit!!.type
             includeDeferred = accountToEdit!!.includeDeferredDebits
             packageName = accountToEdit?.packageName ?: ""
         } else {
+            // Mode "ajout" : réinitialise les champs du formulaire.
             accountName = ""
             selectedAccountType = accountTypes.first()
             includeDeferred = false
@@ -93,11 +103,13 @@ fun AccountManagementScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp)
         ) {
+            // Section du formulaire d'ajout/modification.
             item {
                 Text(title, style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(16.dp))
             }
 
+            // Champ pour le nom du compte.
             item {
                 OutlinedTextField(
                     value = accountName,
@@ -109,6 +121,7 @@ fun AccountManagementScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
+            // Champ pour le nom du package, avec un bouton pour le choisir depuis une liste.
             item {
                 OutlinedTextField(
                     value = packageName,
@@ -123,6 +136,7 @@ fun AccountManagementScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
+            // Sélection du type de compte via des boutons radio.
             item {
                 Text("Type de compte", style = MaterialTheme.typography.titleMedium)
                 Column {
@@ -145,6 +159,7 @@ fun AccountManagementScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
+            // Checkbox pour inclure les débits différés, visible uniquement pour les comptes bancaires.
             if (selectedAccountType == "Bancaire") {
                 item {
                     Row(
@@ -161,6 +176,7 @@ fun AccountManagementScreen(
                 }
             }
 
+            // Boutons pour soumettre le formulaire ou annuler la modification.
             item {
                 Row(
                     Modifier.fillMaxWidth(),
@@ -170,15 +186,12 @@ fun AccountManagementScreen(
                         onClick = {
                             val trimmedName = accountName.trim()
                             if (trimmedName.isBlank()) {
-                                Toast.makeText(
-                                    context,
-                                    "Veuillez donner un nom au compte",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                Toast.makeText(context, "Veuillez donner un nom au compte", Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
 
                             if (isEditing) {
+                                // Met à jour le compte existant.
                                 val updatedAccount = accountToEdit!!.copy(
                                     name = trimmedName,
                                     type = selectedAccountType,
@@ -187,6 +200,7 @@ fun AccountManagementScreen(
                                 )
                                 onUpdateAccount(updatedAccount)
                             } else {
+                                // Ajoute un nouveau compte.
                                 val finalPackageName = packageName.ifBlank { null }
                                 onAddAccount(
                                     trimmedName,
@@ -196,7 +210,7 @@ fun AccountManagementScreen(
                                 )
                             }
 
-                            // Dans les deux cas (ajout ou édition), on quitte la page
+                            // Après ajout ou modification, retourne à l'écran précédent.
                             onAccountAdded()
                         },
                         modifier = Modifier.weight(1f)
@@ -206,7 +220,7 @@ fun AccountManagementScreen(
 
                     if (isEditing) {
                         OutlinedButton(
-                            onClick = { accountToEdit = null },
+                            onClick = { accountToEdit = null }, // Annule le mode édition.
                             modifier = Modifier.weight(1f)
                         ) {
                             Text("Annuler")
@@ -218,6 +232,7 @@ fun AccountManagementScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
+            // Section de la liste des comptes existants.
             item {
                 Text("Comptes existants", style = MaterialTheme.typography.titleMedium)
             }
@@ -233,9 +248,11 @@ fun AccountManagementScreen(
                         Text(account.type, style = MaterialTheme.typography.bodySmall)
                     }
                     Row {
+                        // Icône pour passer en mode édition pour ce compte.
                         IconButton(onClick = { accountToEdit = account }) {
                             Icon(Icons.Default.Edit, contentDescription = "Modifier le compte")
                         }
+                        // Icône pour déclencher la suppression du compte.
                         IconButton(
                             onClick = {
                                 accountToDelete = account
@@ -250,6 +267,7 @@ fun AccountManagementScreen(
         }
     }
 
+    // Affiche le sélecteur d'applications si `showAppPicker` est vrai.
     if (showAppPicker) {
         AppPicker(
             onAppSelected = {
@@ -260,6 +278,7 @@ fun AccountManagementScreen(
         )
     }
 
+    // Affiche le dialogue de confirmation de suppression.
     if (showDeleteConfirmationDialog) {
         AlertDialog(
             onDismissRequest = {
@@ -268,15 +287,14 @@ fun AccountManagementScreen(
             },
             title = { Text("Confirmer la suppression") },
             text = {
-                Text(
-                    "Êtes-vous sûr de vouloir supprimer le compte \"${accountToDelete?.name}\" ? Cette action est irréversible."
-                )
+                Text("Êtes-vous sûr de vouloir supprimer le compte \"${accountToDelete?.name}\" ? Cette action est irréversible.")
             },
             confirmButton = {
                 Button(
                     onClick = {
                         accountToDelete?.let {
                             onDeleteAccount(it)
+                            // Si le compte supprimé était aussi en cours d'édition, on annule l'édition.
                             if (accountToEdit == it) {
                                 accountToEdit = null
                             }

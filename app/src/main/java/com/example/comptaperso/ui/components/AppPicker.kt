@@ -30,12 +30,26 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 
+/**
+ * `AppInfo` est une classe de données qui stocke les informations essentielles sur une application installée.
+ * @param name Le nom de l'application.
+ * @param packageName Le nom du package de l'application.
+ * @param icon L'icône de l'application.
+ */
 data class AppInfo(
     val name: String,
     val packageName: String,
     val icon: Drawable
 )
 
+/**
+ * `AppPicker` est un composant qui affiche une boîte de dialogue permettant à l'utilisateur
+ * de sélectionner une application parmi celles installées sur l'appareil.
+ * Il inclut une barre de recherche pour filtrer la liste.
+ *
+ * @param onAppSelected Callback qui renvoie le nom du package de l'application sélectionnée.
+ * @param onDismissRequest Callback pour fermer la boîte de dialogue.
+ */
 @Composable
 fun AppPicker(
     onAppSelected: (String) -> Unit,
@@ -46,9 +60,10 @@ fun AppPicker(
     var searchQuery by remember { mutableStateOf("") }
     var installedApps by remember { mutableStateOf<List<AppInfo>>(emptyList()) }
 
+    // `LaunchedEffect` pour charger la liste des applications installées une seule fois.
     LaunchedEffect(Unit) {
         val apps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
-            .filter { packageManager.getLaunchIntentForPackage(it.packageName) != null }
+            .filter { packageManager.getLaunchIntentForPackage(it.packageName) != null } // Ne garde que les applications lançables.
             .map {
                 AppInfo(
                     name = it.loadLabel(packageManager).toString(),
@@ -56,10 +71,11 @@ fun AppPicker(
                     icon = it.loadIcon(packageManager)
                 )
             }
-            .sortedBy { it.name.lowercase() }
+            .sortedBy { it.name.lowercase() } // Trie les applications par ordre alphabétique.
         installedApps = apps
     }
 
+    // Filtre la liste des applications en fonction de la recherche de l'utilisateur.
     val filteredApps = if (searchQuery.isBlank()) {
         installedApps
     } else {
@@ -80,6 +96,7 @@ fun AppPicker(
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(16.dp))
+                // Affiche la liste filtrée des applications.
                 LazyColumn {
                     items(filteredApps) { app ->
                         Row(
@@ -92,7 +109,7 @@ fun AppPicker(
                             val bitmap = remember(app.icon) { app.icon.toBitmap() }
                             Image(
                                 bitmap = bitmap.asImageBitmap(),
-                                contentDescription = null, // L'icône est décorative
+                                contentDescription = "Icône de ${app.name}",
                                 modifier = Modifier.size(40.dp)
                             )
                             Text(

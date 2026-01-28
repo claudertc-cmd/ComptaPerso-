@@ -39,11 +39,12 @@ import androidx.compose.ui.unit.dp
 import com.example.comptaperso.data.Account
 
 /**
- * Affiche une liste simplifiée de comptes (Epargne, Assurance) permettant de modifier leur solde.
+ * `SimplifiedAccountsScreen` affiche une liste de comptes pour lesquels seule la modification du solde est nécessaire
+ * (par exemple, les comptes Epargne ou Assurance). L'interface est plus simple que celle de `AccountPage`.
  *
- * @param accounts La liste des comptes à afficher.
+ * @param accounts La liste des comptes de type simplifié à afficher.
  * @param balances La map des soldes actuels pour chaque compte.
- * @param onUpdateBalance Callback pour mettre à jour le solde d'un compte.
+ * @param onUpdateBalance Callback déclenché pour mettre à jour le solde d'un compte.
  */
 @Composable
 fun SimplifiedAccountsScreen(
@@ -51,7 +52,8 @@ fun SimplifiedAccountsScreen(
     balances: Map<String, Double>,
     onUpdateBalance: (accountId: String, newBalance: Double) -> Unit
 ) {
-    // État pour gérer l'affichage de la boîte de dialogue de modification pour un compte spécifique.
+    // `showDialogForAccount` stocke le compte pour lequel la boîte de dialogue de modification doit être affichée.
+    // Si `null`, aucune boîte de dialogue n'est montrée.
     var showDialogForAccount by remember { mutableStateOf<Account?>(null) }
 
     LazyColumn(
@@ -67,29 +69,17 @@ fun SimplifiedAccountsScreen(
                 elevation = CardDefaults.cardElevation(4.dp)
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Affiche le nom et le solde du compte.
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = account.name,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = "%.2f€".format(balance),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
+                        Text(account.name, style = MaterialTheme.typography.titleMedium)
+                        Text("%.2f€".format(balance), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
                     }
-
-                    // Bouton pour ouvrir la boîte de dialogue de modification.
+                    // Icône pour ouvrir la boîte de dialogue de modification.
                     IconButton(onClick = { showDialogForAccount = account }) {
-                        Icon(Icons.Default.Edit, contentDescription = "Modifier le solde")
+                        Icon(Icons.Default.Edit, "Modifier le solde")
                     }
                 }
             }
@@ -97,9 +87,7 @@ fun SimplifiedAccountsScreen(
     }
 
     // Boîte de dialogue pour la saisie du nouveau solde.
-    if (showDialogForAccount != null) {
-        val accountToEdit = showDialogForAccount!!
-        val currentBalance = balances[accountToEdit.id] ?: 0.0
+    showDialogForAccount?.let { accountToEdit ->
         var tempBalance by remember { mutableStateOf("") }
         val focusManager = LocalFocusManager.current
 
@@ -108,30 +96,19 @@ fun SimplifiedAccountsScreen(
             title = { Text("Modifier le solde de ${accountToEdit.name}") },
             text = {
                 Column {
-                    Text(
-                        text = "Solde actuel : %.2f€".format(currentBalance),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Text("Solde actuel : %.2f€".format(balances[accountToEdit.id] ?: 0.0), style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = tempBalance,
                         onValueChange = { tempBalance = it },
                         label = { Text("Nouveau solde") },
                         suffix = { Text("€") },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Decimal,
-                            imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                val newBalance = tempBalance.toDoubleOrNull()
-                                if (newBalance != null) {
-                                    onUpdateBalance(accountToEdit.id, newBalance)
-                                }
-                                focusManager.clearFocus()
-                                showDialogForAccount = null
-                            }
-                        ),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            tempBalance.toDoubleOrNull()?.let { onUpdateBalance(accountToEdit.id, it) }
+                            focusManager.clearFocus()
+                            showDialogForAccount = null
+                        }),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -139,10 +116,7 @@ fun SimplifiedAccountsScreen(
             },
             confirmButton = {
                 Button(onClick = {
-                    val newBalance = tempBalance.toDoubleOrNull()
-                    if (newBalance != null) {
-                        onUpdateBalance(accountToEdit.id, newBalance)
-                    }
+                    tempBalance.toDoubleOrNull()?.let { onUpdateBalance(accountToEdit.id, it) }
                     showDialogForAccount = null
                 }) {
                     Text("Enregistrer")
@@ -155,5 +129,4 @@ fun SimplifiedAccountsScreen(
             }
         )
     }
-
 }
