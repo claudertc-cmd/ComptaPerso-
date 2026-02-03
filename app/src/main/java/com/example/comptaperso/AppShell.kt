@@ -167,16 +167,13 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
         // `currentScreen` gère l'écran actuellement affiché après le splash screen.
         var currentScreen by remember { mutableStateOf<Screen>(Screen.PieChart) }
 
-        // Observe les flux de données depuis le `DataRepository`.
+        // ✅ NOUVEAU FORMAT : Un seul Flow pour tous les comptes
         val accounts by dataRepository.accounts.collectAsState(initial = emptyList())
-        val allTransactions by dataRepository.transactions.collectAsState(initial = emptyMap())
-        val balances by dataRepository.balances.collectAsState(initial = emptyMap())
-        val accountExtras by dataRepository.accountExtras.collectAsState(initial = emptyMap())
 
         // Sauvegarde automatiquement les données sur Firebase dès qu'une modification est détectée.
-        LaunchedEffect(accounts, allTransactions, balances, accountExtras) {
+        LaunchedEffect(accounts) {
             // Ne sauvegarde pas l'état initial vide pour éviter d'écraser les données distantes.
-            if (accounts.isNotEmpty() || allTransactions.isNotEmpty() || balances.isNotEmpty() || accountExtras.isNotEmpty()) {
+            if (accounts.isNotEmpty()) {
                 scope.launch {
                     dataRepository.saveDataToFirebase()
                 }
@@ -206,11 +203,16 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
         val theme = if (currentScreen is Screen.AccountViewPager) {
             val screen = currentScreen as Screen.AccountViewPager
             // Récupère le compte actuellement affiché dans le ViewPager.
-            val account = accounts.filter { it.type == screen.accountType }[screen.initialIndex]
+            val filteredAccounts = accounts.filter { it.type == screen.accountType }
+            val account = if (filteredAccounts.isNotEmpty() && screen.initialIndex < filteredAccounts.size) {
+                filteredAccounts[screen.initialIndex]
+            } else {
+                null
+            }
             // Applique un thème spécifique basé sur le nom du compte.
             when {
-                account.name.contains("Boursobank", ignoreCase = true) -> Theme.BOURSOBANK
-                account.name.contains("Fortuneo", ignoreCase = true) -> Theme.FORTUNEO
+                account?.name?.contains("Boursobank", ignoreCase = true) == true -> Theme.BOURSOBANK
+                account?.name?.contains("Fortuneo", ignoreCase = true) == true -> Theme.FORTUNEO
                 else -> Theme.SPRING
             }
         } else {
@@ -228,7 +230,7 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                         // La barre supérieure est conditionnellement affichée.
                         if (currentScreen !is Screen.AccountViewPager &&
                             currentScreen !is Screen.Home &&
-                            currentScreen !is Screen.PieChart // La TopAppBar n'est pas montrée sur certains écrans.
+                            currentScreen !is Screen.PieChart
                         ) {
                             TopAppBar(
                                 title = {
@@ -247,33 +249,19 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                     containerColor = Color.Transparent
                                 ),
                                 navigationIcon = {
-                                    // Affiche une icône de retour qui ramène à l'écran `PieChart`.
-                                    if (currentScreen !is Screen.PieChart) {
-                                        IconButton(onClick = { currentScreen = Screen.PieChart }) {
-                                            Icon(
-                                                Icons.AutoMirrored.Filled.ArrowBack,
-                                                contentDescription = "Retour"
-                                            )
-                                        }
+                                    IconButton(onClick = { currentScreen = Screen.PieChart }) {
+                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
                                     }
                                 }
                             )
                         }
                     }
-                ) { innerPadding ->
-                    Box(
-                        modifier = Modifier
-                            .padding(innerPadding)
-                            .fillMaxSize()
-                    ) {
-                        // Le `when` détermine quel écran afficher en fonction de `currentScreen`.
+                ) { paddingValues ->
+                    Box(modifier = Modifier.padding(paddingValues)) {
+                        // Navigue vers l'écran approprié en fonction de `currentScreen`.
                         when (val screen = currentScreen) {
-
                             is Screen.Home -> HomeScreen(
                                 accounts = accounts,
-                                balances = balances,
-                                allTransactions = allTransactions,
-                                accountExtras = accountExtras,
                                 onNavigate = { currentScreen = it }
                             )
 
@@ -285,73 +273,27 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                             name = name,
                                             type = type,
                                             includeDeferredDebits = includeDeferred,
-                                            packageName = packageName
+                                            packageName = packageName,
+                                            balance = 0.0,
+                                            extraInfo = AccountExtraInfo(),
+                                            transactions = emptyList()
                                         )
                                         val updatedAccounts = accounts + newAccount
-
-                                        val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-                                        val updatedExtras: Map<String, AccountExtraInfo>
-                                        val updatedBalances: Map<String, Double>
-                                        val updatedTransactions: Map<String, List<com.example.comptaperso.data.Transaction>>
-
-                                        if (type == "Bancaire") {
-                                            updatedExtras = accountExtras.toMutableMap().apply {
-                                                this[newAccount.id] = AccountExtraInfo(
-                                                    provisionalBalance = "0.0",
-                                                    deferredDebits = "0.0",
-                                                    balanceDate = today
-                                                )
-                                            }
-                                            updatedBalances = balances.toMutableMap().apply {
-                                                this[newAccount.id] = 0.0
-                                            }
-                                            updatedTransactions = allTransactions.toMutableMap().apply {
-                                                this[newAccount.id] = mutableListOf()
-                                            }
-                                        } else {
-                                            updatedExtras = accountExtras.toMutableMap().apply {
-                                                this[newAccount.id] = AccountExtraInfo(balanceDate = today)
-                                            }
-                                            updatedBalances = balances // Pas de changement pour les autres types de comptes.
-                                            updatedTransactions = allTransactions // Pas de changement pour les autres types de comptes.
-                                        }
-
-                                        dataRepository.saveAllData(
-                                            updatedAccounts,
-                                            updatedTransactions,
-                                            updatedBalances,
-                                            updatedExtras
-                                        )
+                                        dataRepository.saveAccounts(updatedAccounts)
                                     }
                                 },
                                 onUpdateAccount = { accountToUpdate ->
                                     scope.launch {
-                                        dataRepository.saveAccounts(
-                                            accounts.map {
-                                                if (it.id == accountToUpdate.id) accountToUpdate else it
-                                            }
-                                        )
+                                        val updatedAccounts = accounts.map { account ->
+                                            if (account.id == accountToUpdate.id) accountToUpdate else account
+                                        }
+                                        dataRepository.saveAccounts(updatedAccounts)
                                     }
                                 },
-                                onDeleteAccount = { account ->
+                                onDeleteAccount = { accountToDelete ->
                                     scope.launch {
-                                        val updatedAccounts = accounts.filterNot { it.id == account.id }
-                                        val updatedExtras = accountExtras.toMutableMap().apply {
-                                            remove(account.id)
-                                        }
-                                        val updatedBalances = balances.toMutableMap().apply {
-                                            remove(account.id)
-                                        }
-                                        val updatedTransactions = allTransactions.toMutableMap().apply {
-                                            remove(account.id)
-                                        }
-
-                                        dataRepository.saveAllData(
-                                            updatedAccounts,
-                                            updatedTransactions,
-                                            updatedBalances,
-                                            updatedExtras
-                                        )
+                                        val updatedAccounts = accounts.filterNot { it.id == accountToDelete.id }
+                                        dataRepository.saveAccounts(updatedAccounts)
                                     }
                                 },
                                 onAccountAdded = { currentScreen = Screen.PieChart }
@@ -373,12 +315,7 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                                 onNavigate = { currentScreen = it },
                                 onSaveToJson = {
                                     scope.launch {
-                                        dataRepository.saveDataToJson(
-                                            accounts,
-                                            allTransactions,
-                                            balances,
-                                            accountExtras
-                                        )
+                                        dataRepository.saveDataToJson(accounts)
                                     }
                                 },
                                 onRestoreFromJson = {
@@ -398,64 +335,77 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                             )
 
                             is Screen.AccountViewPager -> {
-                                val filteredAccounts = remember(accounts) {
+                                val filteredAccounts = remember(accounts, screen.accountType) {
                                     accounts.filter { it.type == screen.accountType }
                                 }
-                                val pagerState = rememberPagerState(
-                                    initialPage = screen.initialIndex,
-                                    pageCount = { filteredAccounts.size }
-                                )
-                                AccountViewPagerScreen(
-                                    pagerState = pagerState,
-                                    accounts = filteredAccounts,
-                                    allTransactions = allTransactions,
-                                    accountExtras = accountExtras,
-                                    onUpdate = { accountId, updatedTransactions ->
-                                        scope.launch {
-                                            val newTransactions =
-                                                allTransactions.toMutableMap().apply {
-                                                    this[accountId] =
-                                                        updatedTransactions.toMutableList()
-                                                }
-                                            dataRepository.saveTransactions(newTransactions)
-                                        }
-                                    },
-                                    onUpdateExtras = { accountId, extras ->
-                                        scope.launch {
-                                            val updatedExtras = accountExtras.toMutableMap().apply {
-                                                this[accountId] = extras
-                                            }
-                                            dataRepository.saveAccountExtras(updatedExtras)
 
-                                            val updatedBalances = balances.toMutableMap().apply {
-                                                this[accountId] = extras.provisionalBalance.toDoubleOrNull() ?: 0.0
-                                            }
-                                            dataRepository.saveBalances(updatedBalances)
-                                        }
+                                if (filteredAccounts.isNotEmpty()) {
+                                    val pagerState = rememberPagerState(
+                                        initialPage = screen.initialIndex.coerceIn(0, filteredAccounts.size - 1),
+                                        pageCount = { filteredAccounts.size }
+                                    )
+                                        val allTransactions = remember(filteredAccounts) {
+                                        filteredAccounts.associate { it.id to it.transactions }
                                     }
-                                )
+                                    val accountExtras = remember(filteredAccounts) {
+                                        filteredAccounts.associate { it.id to it.extraInfo }
+                                    }
+                                    AccountViewPagerScreen(
+                                        pagerState = pagerState,
+                                        accounts = filteredAccounts,
+                                        allTransactions = allTransactions,
+                                        accountExtras = accountExtras,
+                                        onUpdate = { accountId, updatedTransactions ->
+                                            scope.launch {
+                                                val updatedAccounts = accounts.map { account ->
+                                                    if (account.id == accountId) {
+                                                        account.copy(transactions = updatedTransactions)
+                                                    } else {
+                                                        account
+                                                    }
+                                                }
+                                                dataRepository.saveAccounts(updatedAccounts)
+                                            }
+                                        },
+                                        onUpdateExtras = { accountId, extras ->
+                                            scope.launch {
+                                                val updatedAccounts = accounts.map { account ->
+                                                    if (account.id == accountId) {
+                                                        account.copy(
+                                                            extraInfo = extras,
+                                                            balance = extras.provisionalBalance.toDoubleOrNull() ?: account.balance
+                                                        )
+                                                    } else {
+                                                        account
+                                                    }
+                                                }
+                                                dataRepository.saveAccounts(updatedAccounts)
+                                            }
+                                        }
+                                    )
+                                }
                             }
 
                             is Screen.SimplifiedAccounts -> {
-                                val filteredAccounts = remember(accounts) {
+                                val filteredAccounts = remember(accounts, screen.accountType) {
                                     accounts.filter { it.type == screen.accountType }
                                 }
                                 SimplifiedAccountsScreen(
                                     accounts = filteredAccounts,
-                                    balances = balances,
                                     onUpdateBalance = { accountId, newBalance ->
                                         scope.launch {
-                                            val updatedBalances = balances.toMutableMap().apply {
-                                                this[accountId] = newBalance
-                                            }
-                                            dataRepository.saveBalances(updatedBalances)
-
                                             val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-                                            val currentExtras = accountExtras[accountId] ?: AccountExtraInfo()
-                                            val updatedExtras = accountExtras.toMutableMap().apply {
-                                                this[accountId] = currentExtras.copy(balanceDate = today)
+                                            val updatedAccounts = accounts.map { account ->
+                                                if (account.id == accountId) {
+                                                    account.copy(
+                                                        balance = newBalance,
+                                                        extraInfo = account.extraInfo.copy(balanceDate = today)
+                                                    )
+                                                } else {
+                                                    account
+                                                }
                                             }
-                                            dataRepository.saveAccountExtras(updatedExtras)
+                                            dataRepository.saveAccounts(updatedAccounts)
                                         }
                                     }
                                 )

@@ -9,13 +9,17 @@ import java.util.UUID
 // L'annotation `@Keep` empêche Proguard d'obfusquer ces classes, ce qui est crucial pour la sérialisation.
 
 /**
- * Représente un compte utilisateur (bancaire, épargne, etc.).
+ * Représente un compte utilisateur (bancaire, épargne, etc.) avec toutes ses données associées.
+ * NOUVEAU FORMAT : Toutes les données du compte sont regroupées dans cette classe.
  *
  * @param id Un identifiant unique pour le compte.
  * @param name Le nom du compte (ex: "Compte Courant").
  * @param type Le type de compte (ex: "Bancaire", "Epargne").
  * @param includeDeferredDebits Indique si les débits différés doivent être inclus dans les calculs de solde.
  * @param packageName Le nom de package de l'application bancaire associée (optionnel).
+ * @param balance Le solde actuel du compte.
+ * @param extraInfo Les informations supplémentaires du compte (solde prévisionnel, débits différés, etc.).
+ * @param transactions La liste des transactions récurrentes associées à ce compte.
  */
 @Keep
 @Serializable
@@ -24,7 +28,10 @@ data class Account(
     var name: String = "",
     var type: String = "",
     var includeDeferredDebits: Boolean = false,
-    var packageName: String? = null
+    var packageName: String? = null,
+    var balance: Double = 0.0,
+    var extraInfo: AccountExtraInfo = AccountExtraInfo(),
+    var transactions: List<Transaction> = emptyList()
 )
 
 /**

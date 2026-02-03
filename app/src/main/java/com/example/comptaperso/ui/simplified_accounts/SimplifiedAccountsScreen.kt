@@ -42,14 +42,12 @@ import com.example.comptaperso.data.Account
  * `SimplifiedAccountsScreen` affiche une liste de comptes pour lesquels seule la modification du solde est nécessaire
  * (par exemple, les comptes Epargne ou Assurance). L'interface est plus simple que celle de `AccountPage`.
  *
- * @param accounts La liste des comptes de type simplifié à afficher.
- * @param balances La map des soldes actuels pour chaque compte.
+ * @param accounts La liste des comptes de type simplifié à afficher (contenant leurs soldes).
  * @param onUpdateBalance Callback déclenché pour mettre à jour le solde d'un compte.
  */
 @Composable
 fun SimplifiedAccountsScreen(
     accounts: List<Account>,
-    balances: Map<String, Double>,
     onUpdateBalance: (accountId: String, newBalance: Double) -> Unit
 ) {
     // `showDialogForAccount` stocke le compte pour lequel la boîte de dialogue de modification doit être affichée.
@@ -62,7 +60,8 @@ fun SimplifiedAccountsScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(accounts, key = { it.id }) { account ->
-            val balance = balances[account.id] ?: 0.0
+            // NOUVEAU FORMAT : Le solde est directement dans l'objet account
+            val balance = account.balance
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -96,7 +95,7 @@ fun SimplifiedAccountsScreen(
             title = { Text("Modifier le solde de ${accountToEdit.name}") },
             text = {
                 Column {
-                    Text("Solde actuel : %.2f€".format(balances[accountToEdit.id] ?: 0.0), style = MaterialTheme.typography.bodyMedium)
+                    Text("Solde actuel : %.2f€".format(accountToEdit.balance), style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = tempBalance,

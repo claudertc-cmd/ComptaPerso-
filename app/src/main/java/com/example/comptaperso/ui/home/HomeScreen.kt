@@ -23,8 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.comptaperso.data.Account
-import com.example.comptaperso.data.AccountExtraInfo
-import com.example.comptaperso.data.Transaction
 import com.example.comptaperso.data.TransactionType
 import com.example.comptaperso.navigation.Screen
 import com.example.comptaperso.ui.components.BalanceSummary
@@ -74,18 +72,12 @@ private fun formatDateAsTimeAgo(isoDate: String): String {
  * Il présente un solde total, puis une liste de comptes regroupés par type (Bancaire, Epargne, etc.).
  * Chaque compte est cliquable pour naviguer vers son écran de détails.
  *
- * @param accounts La liste de tous les comptes de l'utilisateur.
- * @param balances La map des soldes pour les comptes simples (Epargne, etc.).
- * @param allTransactions La map de toutes les transactions pour les comptes complexes.
- * @param accountExtras La map des informations supplémentaires pour les comptes.
+ * @param accounts La liste de tous les comptes de l'utilisateur (contenant toutes leurs données).
  * @param onNavigate Callback pour gérer la navigation vers d'autres écrans.
  */
 @Composable
 fun HomeScreen(
     accounts: List<Account>,
-    balances: Map<String, Double>,
-    allTransactions: Map<String, List<Transaction>>,
-    accountExtras: Map<String, AccountExtraInfo>,
     onNavigate: (Screen) -> Unit
 ) {
     // Définit l'ordre d'affichage des types de comptes.
@@ -107,9 +99,6 @@ fun HomeScreen(
             // Affiche le résumé du solde total en haut de l'écran.
             BalanceSummary(
                 accounts = accounts,
-                balances = balances,
-                allTransactions = allTransactions,
-                accountExtras = accountExtras,
                 onTotalTapped = { onNavigate(Screen.PieChart) } // Navigue vers le graphique en cas de clic.
             )
 
@@ -123,15 +112,21 @@ fun HomeScreen(
                             // Le calcul du solde dépend du type de compte.
                             when (account.type) {
                                 "Bancaire", "Carte de Crédit", "Paypal" -> {
-                                    val extras = accountExtras[account.id]
-                                    val provisional = extras?.provisionalBalance?.toDoubleOrNull() ?: 0.0
-                                    val deferred = if (account.includeDeferredDebits) extras?.deferredDebits?.toDoubleOrNull() ?: 0.0 else 0.0
-                                    val transactions = allTransactions[account.id] ?: emptyList()
-                                    val sumOfUnpaidCredits = transactions.filter { it.type == TransactionType.CREDIT && !it.isPaid }.sumOf { it.amount }
-                                    val sumOfUnpaidDebits = transactions.filter { it.type == TransactionType.DEBIT && !it.isPaid }.sumOf { it.amount }
+                                    val provisional = account.extraInfo.provisionalBalance.toDoubleOrNull() ?: 0.0
+                                    val deferred = if (account.includeDeferredDebits) {
+                                        account.extraInfo.deferredDebits.toDoubleOrNull() ?: 0.0
+                                    } else {
+                                        0.0
+                                    }
+                                    val sumOfUnpaidCredits = account.transactions
+                                        .filter { it.type == TransactionType.CREDIT && !it.isPaid }
+                                        .sumOf { it.amount }
+                                    val sumOfUnpaidDebits = account.transactions
+                                        .filter { it.type == TransactionType.DEBIT && !it.isPaid }
+                                        .sumOf { it.amount }
                                     provisional + sumOfUnpaidCredits - sumOfUnpaidDebits - deferred
                                 }
-                                else -> balances[account.id] ?: 0.0
+                                else -> account.balance
                             }
                         }
 
@@ -156,20 +151,25 @@ fun HomeScreen(
                     items(accountsForType) { account ->
                         val balance = when (account.type) {
                             "Bancaire", "Carte de Crédit", "Paypal" -> {
-                                val extras = accountExtras[account.id]
-                                val provisional = extras?.provisionalBalance?.toDoubleOrNull() ?: 0.0
-                                val deferred = if (account.includeDeferredDebits) extras?.deferredDebits?.toDoubleOrNull() ?: 0.0 else 0.0
-                                val transactions = allTransactions[account.id] ?: emptyList()
-                                val sumOfUnpaidCredits = transactions.filter { it.type == TransactionType.CREDIT && !it.isPaid }.sumOf { it.amount }
-                                val sumOfUnpaidDebits = transactions.filter { it.type == TransactionType.DEBIT && !it.isPaid }.sumOf { it.amount }
+                                val provisional = account.extraInfo.provisionalBalance.toDoubleOrNull() ?: 0.0
+                                val deferred = if (account.includeDeferredDebits) {
+                                    account.extraInfo.deferredDebits.toDoubleOrNull() ?: 0.0
+                                } else {
+                                    0.0
+                                }
+                                val sumOfUnpaidCredits = account.transactions
+                                    .filter { it.type == TransactionType.CREDIT && !it.isPaid }
+                                    .sumOf { it.amount }
+                                val sumOfUnpaidDebits = account.transactions
+                                    .filter { it.type == TransactionType.DEBIT && !it.isPaid }
+                                    .sumOf { it.amount }
                                 provisional + sumOfUnpaidCredits - sumOfUnpaidDebits - deferred
                             }
-                            else -> balances[account.id] ?: 0.0
+                            else -> account.balance
                         }
 
-                        val extraInfo = accountExtras[account.id]
-                        val formattedDate = remember(extraInfo) {
-                            extraInfo?.balanceDate?.takeIf { it.isNotBlank() }?.let { formatDateAsTimeAgo(it) }
+                        val formattedDate = remember(account.extraInfo) {
+                            account.extraInfo.balanceDate.takeIf { it.isNotBlank() }?.let { formatDateAsTimeAgo(it) }
                         }
 
                         Card(
