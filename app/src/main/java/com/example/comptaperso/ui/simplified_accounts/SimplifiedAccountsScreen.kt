@@ -1,5 +1,10 @@
 package com.example.comptaperso.ui.simplified_accounts
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -37,6 +42,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.comptaperso.data.Account
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 /**
  * `SimplifiedAccountsScreen` affiche une liste de comptes pour lesquels seule la modification du solde est nécessaire
@@ -53,6 +61,32 @@ fun SimplifiedAccountsScreen(
     // `showDialogForAccount` stocke le compte pour lequel la boîte de dialogue de modification doit être affichée.
     // Si `null`, aucune boîte de dialogue n'est montrée.
     var showDialogForAccount by remember { mutableStateOf<Account?>(null) }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 800),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
+
+    fun getRelativeDateLabel(isoDate: String): String {
+        return runCatching {
+            val date = LocalDate.parse(isoDate, DateTimeFormatter.ISO_LOCAL_DATE)
+            val days = ChronoUnit.DAYS.between(date, LocalDate.now())
+            when {
+                days <= 0L -> "aujourd'hui"
+                days == 1L -> "hier"
+                days < 7L -> "il y a $days jours"
+                days == 7L -> "il y a une semaine"
+                days < 14L -> "il y a plus d'une semaine"
+                else -> "il y a ${days / 7} semaines"
+            }
+        }.getOrDefault(isoDate)
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -74,7 +108,23 @@ fun SimplifiedAccountsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(account.name, style = MaterialTheme.typography.titleMedium)
-                        Text("%.2f€".format(balance), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
+                        val dateStr = account.extraInfo.balanceDate
+                        val isToday = remember(dateStr) {
+                            runCatching {
+                                LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE) == LocalDate.now()
+                            }.getOrDefault(true)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                            if (dateStr.isNotBlank() && !isToday) {
+                                Text(
+                                    text = "${getRelativeDateLabel(dateStr)} : ",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error.copy(alpha = pulseAlpha),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Text("%.2f€".format(balance), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                        }
                     }
                     // Icône pour ouvrir la boîte de dialogue de modification.
                     IconButton(onClick = { showDialogForAccount = account }) {

@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
+import androidx.annotation.Keep
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -35,28 +36,31 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
  * `AllData` est une classe de données qui encapsule l'ensemble des données de l'application.
  * NOUVEAU FORMAT : Les comptes contiennent maintenant toutes leurs données (transactions, soldes, etc.)
  */
+@Keep
 @Serializable
 data class AllData(
-    val accounts: List<Account>
+    val accounts: List<Account> = emptyList()
 )
 
 /**
  * Structure pour l'ancien format (utilisée uniquement pour la conversion des imports JSON).
  * Conservée pour compatibilité avec d'anciennes sauvegardes.
  */
+@Keep
 @Serializable
 private data class OldAllData(
-    val accounts: List<OldAccount>,
-    val transactions: Map<String, List<Transaction>>,
-    val balances: Map<String, Double>,
-    val accountExtras: Map<String, AccountExtraInfo>
+    val accounts: List<OldAccount> = emptyList(),
+    val transactions: Map<String, List<Transaction>> = emptyMap(),
+    val balances: Map<String, Double> = emptyMap(),
+    val accountExtras: Map<String, AccountExtraInfo> = emptyMap()
 )
 
+@Keep
 @Serializable
 private data class OldAccount(
-    var id: String,
-    var name: String,
-    var type: String,
+    var id: String = "",
+    var name: String = "",
+    var type: String = "",
     var includeDeferredDebits: Boolean = false,
     var packageName: String? = null
 )
@@ -78,18 +82,18 @@ class DataRepository(private val context: Context) {
     private val accountsKey = stringPreferencesKey("accounts")
 
     // Expose les comptes sous forme de `Flow` pour une observation réactive.
-    val accounts: Flow<List<Account>> = context.dataStore.data.map { 
-        Json.decodeFromString(it[accountsKey] ?: "[]") 
+    val accounts: Flow<List<Account>> = context.dataStore.data.map {
+        Json.decodeFromString(it[accountsKey] ?: "[]")
     }
 
-    // --- Authentification --- 
+    // --- Authentification ---
     fun isSignedIn(): Boolean = auth.currentUser != null
     fun signOut() = auth.signOut()
-    suspend fun signIn(email: String, pass: String) = runCatching { 
-        auth.signInWithEmailAndPassword(email, pass).await() 
+    suspend fun signIn(email: String, pass: String) = runCatching {
+        auth.signInWithEmailAndPassword(email, pass).await()
     }
-    suspend fun signUp(email: String, pass: String) = runCatching { 
-        auth.createUserWithEmailAndPassword(email, pass).await() 
+    suspend fun signUp(email: String, pass: String) = runCatching {
+        auth.createUserWithEmailAndPassword(email, pass).await()
     }
 
     /**
@@ -100,12 +104,12 @@ class DataRepository(private val context: Context) {
             it[accountsKey] = Json.encodeToString(accounts)
         }
     }
-    
+
     /**
      * Sauvegarde les comptes.
      */
-    suspend fun saveAccounts(data: List<Account>) = context.dataStore.edit { 
-        it[accountsKey] = Json.encodeToString(data) 
+    suspend fun saveAccounts(data: List<Account>) = context.dataStore.edit {
+        it[accountsKey] = Json.encodeToString(data)
     }
 
     /**
@@ -114,12 +118,12 @@ class DataRepository(private val context: Context) {
     suspend fun saveBalancesToFirestore(accounts: List<Account>) = withContext(Dispatchers.IO) {
         auth.currentUser?.uid?.let { uid ->
             val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-            val data = accounts.map { acc -> 
+            val data = accounts.map { acc ->
                 mapOf(
-                    "id" to acc.id, 
-                    "name" to acc.name, 
+                    "id" to acc.id,
+                    "name" to acc.name,
                     "balance" to acc.balance
-                ) 
+                )
             }
             firestore.collection("users")
                 .document(uid)
@@ -161,8 +165,8 @@ class DataRepository(private val context: Context) {
      */
     suspend fun restoreDataFromJson(uri: Uri) = withContext(Dispatchers.IO) {
         try {
-            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { 
-                it.readText() 
+            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use {
+                it.readText()
             }?.let { jsonString ->
                 restoreData(jsonString)
             }
@@ -204,7 +208,7 @@ class DataRepository(private val context: Context) {
                     } catch (e: Exception) {
                         Log.w("FirebaseRestore", "Nouveau format non disponible, tentative ancien format")
                     }
-                    
+
                     // Si échec, tentative avec l'ancien format
                     try {
                         val oldData = doc.toObject(OldAllData::class.java)
@@ -238,13 +242,13 @@ class DataRepository(private val context: Context) {
             } catch (e: Exception) {
                 Log.w("Restore", "Nouveau format non détecté, tentative ancien format")
             }
-            
+
             // Si échec, tentative avec l'ancien format et conversion
             val oldData = Json.decodeFromString<OldAllData>(jsonString)
             val convertedAccounts = convertOldDataToNew(oldData)
             saveAllData(convertedAccounts)
             Log.i("Conversion", "Données converties depuis l'ancien format")
-            
+
         } catch (e: Exception) {
             Log.e("DataRestoreError", "Erreur de désérialisation", e)
         }
@@ -257,13 +261,13 @@ class DataRepository(private val context: Context) {
     private fun convertOldDataToNew(oldData: OldAllData): List<Account> {
         // Récupère tous les IDs de comptes valides
         val validAccountIds = oldData.accounts.map { it.id }.toSet()
-        
+
         return oldData.accounts.map { oldAccount ->
             // Filtre accountExtras pour ne garder que les vraies données de compte
             val extras = oldData.accountExtras
                 .filterKeys { key -> validAccountIds.contains(key) }
                 .get(oldAccount.id) ?: AccountExtraInfo()
-            
+
             Account(
                 id = oldAccount.id,
                 name = oldAccount.name,

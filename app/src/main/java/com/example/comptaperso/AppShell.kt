@@ -300,6 +300,7 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
                             )
 
                             is Screen.PieChart -> PieChartScreen(
+                                accounts = accounts,
                                 onAccountClick = { accountId ->
                                     val account = accounts.find { it.id == accountId }
                                     if (account != null) {

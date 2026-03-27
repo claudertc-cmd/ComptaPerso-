@@ -22,6 +22,11 @@ import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -63,6 +68,7 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import java.time.temporal.ChronoUnit
 
 /**
  * `AccountPage` affiche les détails d'un compte bancaire, y compris le solde, les transactions,
@@ -136,12 +142,36 @@ fun AccountPage(
     val sortedCredits = remember(credits) { credits.sortedBy { it.dayOfMonth } }
     val sortedDebits = remember(debits) { debits.sortedBy { it.dayOfMonth } }
     val currentDate = remember { LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE) }
+    val balanceDateStr = extras?.balanceDate ?: currentDate
+    val isBalanceDateToday = remember(balanceDateStr) {
+        runCatching {
+            LocalDate.parse(balanceDateStr, DateTimeFormatter.ISO_LOCAL_DATE) == LocalDate.now()
+        }.getOrDefault(true)
+    }
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 800),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
 
-    // Fonction utilitaire pour formater une date ISO en format lisible.
-    fun formatDateForDisplay(isoDate: String): String {
+    // Fonction utilitaire pour afficher une date en format relatif.
+    fun getRelativeDateLabel(isoDate: String): String {
         return runCatching {
-            LocalDate.parse(isoDate, DateTimeFormatter.ISO_LOCAL_DATE)
-                .format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM))
+            val date = LocalDate.parse(isoDate, DateTimeFormatter.ISO_LOCAL_DATE)
+            val days = ChronoUnit.DAYS.between(date, LocalDate.now())
+            when {
+                days <= 0L -> "aujourd'hui"
+                days == 1L -> "hier"
+                days < 7L -> "il y a $days jours"
+                days == 7L -> "il y a une semaine"
+                days < 14L -> "il y a plus d'une semaine"
+                else -> "il y a ${days / 7} semaines"
+            }
         }.getOrDefault(isoDate)
     }
 
@@ -182,7 +212,16 @@ fun AccountPage(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Solde Banque au ${formatDateForDisplay(extras?.balanceDate ?: currentDate)}", style = MaterialTheme.typography.bodyMedium)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Solde Banque - ", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                text = getRelativeDateLabel(extras?.balanceDate ?: currentDate),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (isBalanceDateToday) MaterialTheme.colorScheme.onSurface
+                                        else MaterialTheme.colorScheme.error.copy(alpha = pulseAlpha),
+                                fontWeight = if (isBalanceDateToday) null else FontWeight.Bold
+                            )
+                        }
                         Text("%.2f€".format(extras?.provisionalBalance?.toDoubleOrNull() ?: 0.0), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
                     }
 

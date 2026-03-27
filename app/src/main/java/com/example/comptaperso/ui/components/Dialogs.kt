@@ -108,7 +108,7 @@ fun EditTransactionDialog(
                 name = name,
                 dayOfMonth = dayInt,
                 amount = amountDouble,
-                type = transactionType,
+                type = transaction?.type ?: transactionType, // Conserve le type original en modification.
                 isPaid = transaction?.isPaid ?: false
             )
             onSave(newTransaction)

@@ -46,7 +46,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.comptaperso.data.Account
 import com.example.comptaperso.navigation.Screen
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
+import java.time.temporal.ChronoUnit
 import com.example.comptaperso.ui.components.RollingInt
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -71,6 +76,7 @@ import kotlin.math.sin
 @Composable
 fun PieChartScreen(
     viewModel: PieChartViewModel = viewModel(),
+    accounts: List<Account> = emptyList(),
     onAccountClick: (String) -> Unit,
     onNavigate: (Screen) -> Unit,
     onSaveToJson: () -> Unit,
@@ -123,6 +129,7 @@ fun PieChartScreen(
                     groupedData = groupedData,
                     groupColors = groupColors,
                     accountColors = accountColors,
+                    accounts = accounts,
                     onAccountClick = onAccountClick
                 )
             }
@@ -281,6 +288,7 @@ private fun ChartLegend(
     groupedData: List<GroupedChartData>,
     groupColors: List<Color>,
     accountColors: List<Color>,
+    accounts: List<Account> = emptyList(),
     onAccountClick: (String) -> Unit
 ) {
     val groupAccountColorOffsets = remember(groupedData) {
@@ -345,8 +353,16 @@ private fun ChartLegend(
                             .background(color, CircleShape)
                     )
                     Spacer(Modifier.width(16.dp)) // Spacer to align text with category text
+                    val balanceDate = accounts
+                        .firstOrNull { it.id == accountData.id && it.type == "Bancaire" }
+                        ?.extraInfo?.balanceDate
+                    val displayLabel = if (!balanceDate.isNullOrBlank()) {
+                        "${accountData.label} (${getRelativeDateLabel(balanceDate)})"
+                    } else {
+                        accountData.label
+                    }
                     Text(
-                        text = accountData.label,
+                        text = displayLabel,
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyLarge
                     )
@@ -359,6 +375,21 @@ private fun ChartLegend(
             }
         }
     }
+}
+
+private fun getRelativeDateLabel(isoDate: String): String {
+    return runCatching {
+        val date = LocalDate.parse(isoDate, DateTimeFormatter.ISO_LOCAL_DATE)
+        val days = ChronoUnit.DAYS.between(date, LocalDate.now())
+        when {
+            days <= 0L -> "aujourd'hui"
+            days == 1L -> "hier"
+            days < 7L -> "il y a $days jours"
+            days == 7L -> "il y a une semaine"
+            days < 14L -> "il y a plus d'une semaine"
+            else -> "il y a ${days / 7} semaines"
+        }
+    }.getOrDefault(isoDate)
 }
 
 private fun generateColorPalettes(): List<List<Color>> {
