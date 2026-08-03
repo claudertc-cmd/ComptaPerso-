@@ -14,8 +14,8 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.comptaperso.DateUtils
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
+import com.google.firebase.firestore.firestore
+import com.google.firebase.Firebase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -23,12 +23,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 // Extension pour accéder facilement au DataStore depuis le contexte de l'application.
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -155,8 +151,8 @@ class DataRepository(private val context: Context) {
             } ?: throw IOException("Impossible de créer l'entrée MediaStore.")
 
             saveBalancesToFirestore(accounts) // Sauvegarde aussi l'historique sur Firestore.
-        } catch (e: Exception) {
-            Log.e("JsonSaveError", "Erreur lors de la sauvegarde du fichier JSON", e)
+        } catch (_: Exception) {
+            Log.e("JsonSaveError", "Erreur lors de la sauvegarde du fichier JSON")
         }
     }
 
@@ -184,8 +180,8 @@ class DataRepository(private val context: Context) {
             try {
                 val data = AllData(accounts.first())
                 firestore.collection("users").document(uid).set(data).await()
-            } catch (e: Exception) {
-                Log.e("FirebaseSaveError", "Erreur de sauvegarde sur Firestore", e)
+            } catch (_: Exception) {
+                Log.e("FirebaseSaveError", "Erreur de sauvegarde sur Firestore")
             }
         }
     }
@@ -206,7 +202,7 @@ class DataRepository(private val context: Context) {
                             saveAllData(data.accounts)
                             return@withContext
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         Log.w("FirebaseRestore", "Nouveau format non disponible, tentative ancien format")
                     }
 
@@ -266,8 +262,7 @@ class DataRepository(private val context: Context) {
         return oldData.accounts.map { oldAccount ->
             // Filtre accountExtras pour ne garder que les vraies données de compte
             val extras = oldData.accountExtras
-                .filterKeys { key -> validAccountIds.contains(key) }
-                .get(oldAccount.id) ?: AccountExtraInfo()
+                .filterKeys { key -> validAccountIds.contains(key) }[oldAccount.id] ?: AccountExtraInfo()
 
             Account(
                 id = oldAccount.id,

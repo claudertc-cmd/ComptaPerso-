@@ -59,6 +59,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
+import kotlin.time.Duration.Companion.seconds
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
@@ -74,7 +76,7 @@ fun AppShell(activity: MainActivity, onLogout: () -> Unit) {
         if (showSplashScreen) {
             restoreState = RestoreState.InProgress
             scope.launch {
-                val result = withTimeoutOrNull(30_000L) {
+                val result = withTimeoutOrNull(30.seconds) {
                     try {
                         dataRepository.restoreDataFromFirebase()
                         RestoreState.Success
