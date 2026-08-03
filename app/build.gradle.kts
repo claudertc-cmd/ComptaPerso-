@@ -5,9 +5,7 @@ plugins {
 
     // Nécessaire pour Firebase (Crashlytics/Analytics etc. si tu les ajoutes plus tard)
     alias(libs.plugins.google.services)
-
-    // Garde-le seulement si tu utilises @Serializable dans ce module
-    kotlin("plugin.serialization") version "1.9.23"
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -15,9 +13,7 @@ android {
     namespace = "com.example.comptaperso"
 
     // Style du 2e fichier (qui fonctionne déjà)
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.comptaperso"
@@ -69,6 +65,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-text-google-fonts")
     implementation(libs.androidx.compose.animation.core)
     implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.foundation:foundation-layout")
+    implementation("androidx.compose.runtime:runtime")
 
     // Biometric EXACTEMENT comme dans l’app de test
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
@@ -80,7 +78,8 @@ dependencies {
 
     // DataStore + Serialization (app originale)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3") // [web:40]
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
 
     // Annotation
     implementation("androidx.annotation:annotation:1.9.1")

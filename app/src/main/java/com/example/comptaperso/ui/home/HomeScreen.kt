@@ -26,55 +26,8 @@ import com.example.comptaperso.data.Account
 import com.example.comptaperso.data.TransactionType
 import com.example.comptaperso.navigation.Screen
 import com.example.comptaperso.ui.components.BalanceSummary
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
-import java.time.format.FormatStyle
-import java.time.temporal.ChronoUnit
+import com.example.comptaperso.DateUtils
 
-/**
- * Formate une date ISO (ex: "2023-10-27") en une chaîne de caractères lisible (ex: "27 oct. 2023").
- * @param isoDate La date au format ISO.
- * @return La date formatée ou la chaîne originale en cas d'erreur.
- */
-private fun formatDateForDisplay(isoDate: String): String {
-    return try {
-        val date = LocalDate.parse(isoDate, DateTimeFormatter.ISO_LOCAL_DATE)
-        date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM))
-    } catch (e: DateTimeParseException) {
-        isoDate
-    }
-}
-
-/**
- * Formate une date ISO en une chaîne de caractères relative (ex: "Aujourd'hui", "Hier", "Il y a 3 jours").
- * @param isoDate La date au format ISO.
- * @return La date formatée en format relatif ou la chaîne originale en cas d'erreur.
- */
-private fun formatDateAsTimeAgo(isoDate: String): String {
-    return try {
-        val date = LocalDate.parse(isoDate, DateTimeFormatter.ISO_LOCAL_DATE)
-        val today = LocalDate.now()
-        val daysBetween = ChronoUnit.DAYS.between(date, today)
-
-        when (daysBetween) {
-            0L -> "Aujourd'hui"
-            1L -> "Hier"
-            else -> "Il y a $daysBetween jours"
-        }
-    } catch (e: DateTimeParseException) {
-        isoDate
-    }
-}
-
-/**
- * `HomeScreen` est l'écran principal qui affiche un résumé des comptes de l'utilisateur.
- * Il présente un solde total, puis une liste de comptes regroupés par type (Bancaire, Epargne, etc.).
- * Chaque compte est cliquable pour naviguer vers son écran de détails.
- *
- * @param accounts La liste de tous les comptes de l'utilisateur (contenant toutes leurs données).
- * @param onNavigate Callback pour gérer la navigation vers d'autres écrans.
- */
 @Composable
 fun HomeScreen(
     accounts: List<Account>,
@@ -169,7 +122,7 @@ fun HomeScreen(
                         }
 
                         val formattedDate = remember(account.extraInfo) {
-                            account.extraInfo.balanceDate.takeIf { it.isNotBlank() }?.let { formatDateAsTimeAgo(it) }
+                            account.extraInfo.balanceDate.takeIf { it.isNotBlank() }?.let { DateUtils.getRelativeDateLabel(it) }
                         }
 
                         Card(

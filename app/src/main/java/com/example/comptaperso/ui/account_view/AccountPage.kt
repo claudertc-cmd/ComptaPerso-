@@ -64,11 +64,9 @@ import com.example.comptaperso.data.TransactionType
 import com.example.comptaperso.ui.components.ChooseActionDialog
 import com.example.comptaperso.ui.components.EditTransactionDialog
 import com.example.comptaperso.ui.components.TransactionRow
+import com.example.comptaperso.DateUtils
 import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
-import java.time.temporal.ChronoUnit
 
 /**
  * `AccountPage` affiche les détails d'un compte bancaire, y compris le solde, les transactions,
@@ -141,12 +139,10 @@ fun AccountPage(
     val (credits, debits) = remember(transactions) { transactions.partition { it.type == TransactionType.CREDIT } }
     val sortedCredits = remember(credits) { credits.sortedBy { it.dayOfMonth } }
     val sortedDebits = remember(debits) { debits.sortedBy { it.dayOfMonth } }
-    val currentDate = remember { LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE) }
+    val currentDate = remember { DateUtils.getTodayIso() }
     val balanceDateStr = extras?.balanceDate ?: currentDate
     val isBalanceDateToday = remember(balanceDateStr) {
-        runCatching {
-            LocalDate.parse(balanceDateStr, DateTimeFormatter.ISO_LOCAL_DATE) == LocalDate.now()
-        }.getOrDefault(true)
+        DateUtils.isToday(balanceDateStr)
     }
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseAlpha by infiniteTransition.animateFloat(
@@ -158,22 +154,6 @@ fun AccountPage(
         ),
         label = "pulseAlpha"
     )
-
-    // Fonction utilitaire pour afficher une date en format relatif.
-    fun getRelativeDateLabel(isoDate: String): String {
-        return runCatching {
-            val date = LocalDate.parse(isoDate, DateTimeFormatter.ISO_LOCAL_DATE)
-            val days = ChronoUnit.DAYS.between(date, LocalDate.now())
-            when {
-                days <= 0L -> "aujourd'hui"
-                days == 1L -> "hier"
-                days < 7L -> "il y a $days jours"
-                days == 7L -> "il y a une semaine"
-                days < 14L -> "il y a plus d'une semaine"
-                else -> "il y a ${days / 7} semaines"
-            }
-        }.getOrDefault(isoDate)
-    }
 
     Scaffold(
         floatingActionButton = {
@@ -215,7 +195,7 @@ fun AccountPage(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Solde Banque - ", style = MaterialTheme.typography.bodyMedium)
                             Text(
-                                text = getRelativeDateLabel(extras?.balanceDate ?: currentDate),
+                                text = DateUtils.getRelativeDateLabel(extras?.balanceDate ?: currentDate),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = if (isBalanceDateToday) MaterialTheme.colorScheme.onSurface
                                         else MaterialTheme.colorScheme.error.copy(alpha = pulseAlpha),
@@ -378,7 +358,7 @@ fun AccountPage(
             },
             confirmButton = {
                 Button(onClick = {
-                    onUpdateExtras(AccountExtraInfo(provisional, deferred, LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)))
+                    onUpdateExtras(AccountExtraInfo(provisional, deferred, DateUtils.getTodayIso()))
                     showBalanceDialog = false
                     triggerOverdueCheck = true
                 }) { Text("Enregistrer") }

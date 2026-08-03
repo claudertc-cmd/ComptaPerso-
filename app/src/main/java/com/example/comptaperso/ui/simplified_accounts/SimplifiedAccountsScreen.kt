@@ -42,9 +42,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.comptaperso.data.Account
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
+import com.example.comptaperso.DateUtils
 
 /**
  * `SimplifiedAccountsScreen` affiche une liste de comptes pour lesquels seule la modification du solde est nécessaire
@@ -73,21 +71,6 @@ fun SimplifiedAccountsScreen(
         label = "pulseAlpha"
     )
 
-    fun getRelativeDateLabel(isoDate: String): String {
-        return runCatching {
-            val date = LocalDate.parse(isoDate, DateTimeFormatter.ISO_LOCAL_DATE)
-            val days = ChronoUnit.DAYS.between(date, LocalDate.now())
-            when {
-                days <= 0L -> "aujourd'hui"
-                days == 1L -> "hier"
-                days < 7L -> "il y a $days jours"
-                days == 7L -> "il y a une semaine"
-                days < 14L -> "il y a plus d'une semaine"
-                else -> "il y a ${days / 7} semaines"
-            }
-        }.getOrDefault(isoDate)
-    }
-
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -110,14 +93,12 @@ fun SimplifiedAccountsScreen(
                         Text(account.name, style = MaterialTheme.typography.titleMedium)
                         val dateStr = account.extraInfo.balanceDate
                         val isToday = remember(dateStr) {
-                            runCatching {
-                                LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE) == LocalDate.now()
-                            }.getOrDefault(true)
+                            DateUtils.isToday(dateStr)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
                             if (dateStr.isNotBlank() && !isToday) {
                                 Text(
-                                    text = "${getRelativeDateLabel(dateStr)} : ",
+                                    text = "${DateUtils.getRelativeDateLabel(dateStr)} : ",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.error.copy(alpha = pulseAlpha),
                                     fontWeight = FontWeight.Bold

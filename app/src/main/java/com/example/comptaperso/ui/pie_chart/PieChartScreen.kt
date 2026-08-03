@@ -48,10 +48,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.comptaperso.data.Account
 import com.example.comptaperso.navigation.Screen
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
-import java.time.temporal.ChronoUnit
+import com.example.comptaperso.DateUtils
 import com.example.comptaperso.ui.components.RollingInt
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -357,7 +354,7 @@ private fun ChartLegend(
                         .firstOrNull { it.id == accountData.id && it.type == "Bancaire" }
                         ?.extraInfo?.balanceDate
                     val displayLabel = if (!balanceDate.isNullOrBlank()) {
-                        "${accountData.label} (${getRelativeDateLabel(balanceDate)})"
+                        "${accountData.label} (${DateUtils.getRelativeDateLabel(balanceDate)})"
                     } else {
                         accountData.label
                     }
@@ -375,21 +372,6 @@ private fun ChartLegend(
             }
         }
     }
-}
-
-private fun getRelativeDateLabel(isoDate: String): String {
-    return runCatching {
-        val date = LocalDate.parse(isoDate, DateTimeFormatter.ISO_LOCAL_DATE)
-        val days = ChronoUnit.DAYS.between(date, LocalDate.now())
-        when {
-            days <= 0L -> "aujourd'hui"
-            days == 1L -> "hier"
-            days < 7L -> "il y a $days jours"
-            days == 7L -> "il y a une semaine"
-            days < 14L -> "il y a plus d'une semaine"
-            else -> "il y a ${days / 7} semaines"
-        }
-    }.getOrDefault(isoDate)
 }
 
 private fun generateColorPalettes(): List<List<Color>> {

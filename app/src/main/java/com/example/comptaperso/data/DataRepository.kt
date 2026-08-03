@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.comptaperso.DateUtils
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -117,7 +118,7 @@ class DataRepository(private val context: Context) {
      */
     suspend fun saveBalancesToFirestore(accounts: List<Account>) = withContext(Dispatchers.IO) {
         auth.currentUser?.uid?.let { uid ->
-            val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val date = DateUtils.getTodayIso()
             val data = accounts.map { acc ->
                 mapOf(
                     "id" to acc.id,
